@@ -148,3 +148,17 @@ def test_vercel_can_detect_every_api_function():
         mod = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(mod)
         assert issubclass(mod.handler, BaseHTTPRequestHandler) and hasattr(mod.handler, "do_POST")
+
+
+def test_responses_never_carry_a_secret(server, monkeypatch):
+    """Even if an error message contained the site password or a key, it is hidden."""
+    monkeypatch.setenv("GEMINI_API_KEY", "AIzaFAKEKEY123456")
+
+    def leaky(*a, **kw):
+        raise RuntimeError("upstream said: bad key AIzaFAKEKEY123456 / pw s3cret")
+
+    monkeypatch.setattr(web, "run_one", leaky)
+    status, out = call(server, "run", {"domain": "attio.com"})
+    assert status == 500
+    assert "AIzaFAKEKEY123456" not in out["error"] and "s3cret" not in out["error"]
+    assert "[hidden]" in out["error"]

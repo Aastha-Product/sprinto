@@ -20,7 +20,7 @@ import os
 import re
 from http.server import BaseHTTPRequestHandler
 
-from .config import Settings, get_settings
+from .config import Settings, get_settings, redact
 from .orchestrator import run_batch, _display
 from .store import Store
 from . import exporter, poc
@@ -132,7 +132,9 @@ def export(results: list[dict], reviews: dict | None = None) -> dict:
 
 # --- HTTP plumbing shared by the api/*.py files and the local server --------------
 def _respond(req: BaseHTTPRequestHandler, status: int, payload: dict) -> None:
-    body = json.dumps(payload).encode()
+    # last line of defence: no key or password value ever leaves the server,
+    # whatever an upstream error message happened to contain
+    body = redact(json.dumps(payload)).encode()
     req.send_response(status)
     req.send_header("Content-Type", "application/json")
     req.send_header("Cache-Control", "no-store")
