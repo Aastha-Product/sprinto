@@ -35,5 +35,28 @@
   ],
   "stage_thresholds": {
     "min_open_roles": 5
-  }
+  },
+
+  "_ranking_comment": "Ranking signals from the brief's ICP ('typically Series A-C', 'preparing for an audit or under pressure from enterprise customers'). They set the rank and feed the hook; they never gate qualification.",
+  "ranking": {
+    "target_stages": ["series a", "series b", "series c"],
+    "early_stages": ["pre-seed", "seed"],
+    "compliance_terms": [
+      "compliance manager", "compliance lead", "head of compliance", "grc",
+      "security engineer", "security lead", "head of security", "ciso",
+      "soc 2 in progress", "working towards soc 2", "pursuing soc 2", "soc 2 readiness",
+      "security questionnaire", "security review", "vendor assessment", "audit"
+    ]
+  },
+
+  "_personas_comment": "Who Sprinto sells to, best first. PoC choice takes the lowest-rank persona whose keywords match the title; ties go to Hunter's confidence. No match = no contact (flagged), never 'nearest manager'.",
+  "personas": [
+    {"id": "compliance_security_lead", "rank": 1,
+     "keywords": ["compliance", "grc", "security", "ciso", "risk", "trust"],
+     "seniority": ["head", "lead", "director", "vp", "vice president", "chief", "ciso", "manager", "officer"]},
+    {"id": "engineering_leader", "rank": 2,
+     "keywords": ["cto", "chief technology", "vp engineering", "vp of engineering", "head of engineering", "director of engineering"]},
+    {"id": "founder_exec", "rank": 3,
+     "keywords": ["founder", "co-founder", "ceo", "chief executive", "coo", "chief operating"]}
+  ]
 }

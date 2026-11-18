@@ -9,6 +9,7 @@ tests) run with no network. Path -> file: '/' -> index, '/careers' -> careers, e
 """
 from __future__ import annotations
 
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from urllib import robotparser
@@ -27,6 +28,11 @@ class Fetch:
     status: str          # ok | thin | missing | blocked | error
     reason: str = ""
 
+    @property
+    def failed(self) -> bool:
+        """The page could not be read at all (as opposed to 'read, but says little')."""
+        return self.status in ("missing", "blocked", "error")
+
 
 def _path_to_file(path: str) -> str:
     name = (path.strip("/") or "index").replace("/", "_")
@@ -34,11 +40,24 @@ def _path_to_file(path: str) -> str:
 
 
 class Scraper:
-    def __init__(self, samples_dir: Path, offline: bool = False, use_browser: bool = False):
+    def __init__(self, samples_dir: Path, offline: bool = False, use_browser: bool = False,
+                 delay: float = 0.0):
         self.samples_dir = samples_dir
         self.offline = offline
         self.use_browser = use_browser
+        self.delay = delay  # polite pause between requests to the same site (slide 22)
         self._robots: dict[str, robotparser.RobotFileParser] = {}
+        self._last_hit: dict[str, float] = {}
+
+    def _pause(self, domain: str) -> None:
+        if self.offline or self.delay <= 0:
+            return
+        last = self._last_hit.get(domain)
+        if last is not None:
+            wait = self.delay - (time.monotonic() - last)
+            if wait > 0:
+                time.sleep(wait)
+        self._last_hit[domain] = time.monotonic()
 
     # --- robots ---
     def robots_allowed(self, domain: str, path: str) -> bool:
@@ -62,10 +81,12 @@ class Scraper:
             return self._fetch_offline(domain, path, url)
         if not self.robots_allowed(domain, path):
             return Fetch(url, "", "", "request", "blocked", "robots.txt disallows")
+        self._pause(domain)
         try:
             raw = self._request(url)
         except Exception as exc:
-            return Fetch(url, "", "", "request", "error", str(exc)[:120])
+            status = "blocked" if _looks_blocked(exc) else "error"
+            return Fetch(url, "", "", "request", status, str(exc)[:120])
         clean = clean_html(raw)
         if len(clean) < _MIN_CONTENT and self.use_browser:
             try:
@@ -100,3 +121,9 @@ class Scraper:
         raw = f.read_text(encoding="utf-8")
         clean = clean_html(raw)
         return Fetch(url, raw, clean, "offline", "ok" if clean else "thin")
+
+
+def _looks_blocked(exc: Exception) -> bool:
+    """403/429/503 from a bot wall or rate limit: logged as blocked, never bypassed (slide 21)."""
+    resp = getattr(exc, "response", None)
+    return getattr(resp, "status_code", None) in (401, 403, 429, 503)

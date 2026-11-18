@@ -1,7 +1,9 @@
 # Real-mode dependencies. The pipeline also runs fully offline in mock mode
 # using only the Python standard library (no installs required) --- see README.
-httpx>=0.27            # request-based fetch
+# Prefer `pip install -e ".[dev]"` (pyproject.toml); this file mirrors it.
+httpx>=0.27            # request-based fetch + Hunter.io
 beautifulsoup4>=4.12   # HTML cleaning
-anthropic>=0.39        # LLM (real mode); any other provider can be slotted into llm.py
+anthropic>=2.10        # LLM: structured outputs + refusal fallbacks
 # Optional:
 # playwright>=1.47      # headless-browser fallback for JS-rendered pages (then: playwright install chromium)
+# pytest>=8             # tests

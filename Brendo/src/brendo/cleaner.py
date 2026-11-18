@@ -4,6 +4,9 @@ The deck's rule: strip nav/footer/cookie, dedupe repeated blocks, keep the real
 content, cap the output (~2,000 tokens). One adaptation: we keep short lines that
 carry a named signal (certifications, 'Series B', 'open roles', 'enterprise'),
 because the 8-word drop would otherwise discard exactly the facts we qualify on.
+
+<header> is NOT dropped wholesale: many sites put the hero <h1> there, and the deck says
+keep hero copy. Its navigation still goes, because the <nav> inside it is dropped.
 """
 from __future__ import annotations
 
@@ -19,10 +22,10 @@ _BOILERPLATE = re.compile(
 )
 _SIGNAL = re.compile(
     r"(soc ?2|iso ?27001|gdpr|hipaa|pci|series [a-e]|seed|open roles?|enterprise|"
-    r"saas|compliance|funding|raised)",
+    r"saas|compliance|funding|raised|security|audit|grc|ciso|questionnaire)",
     re.IGNORECASE,
 )
-_DROP_TAGS = {"script", "style", "nav", "footer", "header", "form", "aside", "noscript", "svg"}
+_DROP_TAGS = {"script", "style", "nav", "footer", "form", "aside", "noscript", "svg"}
 
 
 class _Stripper(HTMLParser):

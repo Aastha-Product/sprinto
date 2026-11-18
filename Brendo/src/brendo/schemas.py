@@ -17,6 +17,7 @@ class CompanyFields:
     funding_stage: str | None = None
     open_roles_count: int | None = None
     enterprise_customers: bool | None = None
+    compliance_signals: list[str] = field(default_factory=list)  # audit prep, compliance hiring...
     evidence: dict[str, str] = field(default_factory=dict)  # field -> source snippet
 
     def has(self, name: str) -> bool:
@@ -35,7 +36,8 @@ class Qualification:
     reasons: list[str] = field(default_factory=list)
     evidence: dict[str, str] = field(default_factory=dict)
     fetches_used: int = 0
-    rank: str = "normal"              # normal | lower
+    rank: str = "normal"              # high | normal | lower
+    flags: list[str] = field(default_factory=list)   # notes for the human reviewer
 
 
 @dataclass
@@ -43,8 +45,10 @@ class Contact:
     name: str | None = None
     role: str | None = None
     email: str | None = None
-    source: str = ""                  # hunter | apollo_hardcode | mock
+    source: str = ""                  # hunter | contacts_file | mock
     confidence: float = 0.0
+    persona: str | None = None        # which buyer persona matched (icp.json)
+    reason: str = ""                  # why this person (defensibility)
 
 
 @dataclass
@@ -53,20 +57,24 @@ class Email:
     body: str = ""
     hook: str = ""
     pains: list[str] = field(default_factory=list)
-    sent: bool = False
+    hook_evidence_field: str | None = None
+    footer: str = ""                  # "why" note appended to the self-sent copy
+    sent: bool = False                # delivered via Gmail
+    drafted: bool = False             # written to the mock outbox
     message_id: str | None = None
 
 
 @dataclass
 class CompanyResult:
     domain: str
-    status: str = "pending"           # mirrors Qualification.verdict, plus sent/skipped
+    status: str = "pending"           # mirrors Qualification.verdict, plus sent/drafted/failed
     company: CompanyFields | None = None
     qualification: Qualification | None = None
     contact: Contact | None = None
     email: Email | None = None
     decisions: list[dict] = field(default_factory=list)
     error: str | None = None
+    seconds: float = 0.0
 
     def log(self, step: str, rationale: str) -> None:
         self.decisions.append({"step": step, "rationale": rationale})
@@ -81,4 +89,5 @@ class CompanyResult:
             "email": asdict(self.email) if self.email else None,
             "decisions": self.decisions,
             "error": self.error,
+            "seconds": round(self.seconds, 2),
         }
