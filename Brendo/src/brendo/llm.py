@@ -117,7 +117,8 @@ _EMAIL_SYS = (
     "fact, and set hook_evidence_field to that fact's field; state nothing about the "
     "company that is not in the given facts; human and plain, not salesy; under 120 "
     "words; end with a low-friction ask; no placeholders like [Name] or {{...}}; sign "
-    "off as 'The Sprinto team'."
+    "off as 'The Sprinto team'. Format the body as a plain-text email: the greeting on "
+    "its own line, then 2-3 short paragraphs, then the sign-off, separated by blank lines."
 )
 
 
