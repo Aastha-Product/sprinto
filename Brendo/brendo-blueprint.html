@@ -1,0 +1,776 @@
+<title>Brendo Blueprint</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+/* Layout: fixed left TOC rail + single reading column; collapses to stacked on phone.
+   Utilitarian technical-doc treatment — ink neutrals, one teal accent, mono for fields. */
+:root{
+  --bg:#ffffff; --surface:#f5f7f8; --surface-2:#eceff1; --fg:#161b22; --muted:#596573;
+  --border:#dfe4e8; --accent:#0d8f84; --accent-weak:#d7efec; --accent-fg:#0b6f67;
+  --ok:#1a7f4b; --warn:#9a6a00; --crit:#b23b3b; --code:#0b4f49;
+  --mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --sans:"Inter",system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+  --display:"Space Grotesk","Inter",system-ui,sans-serif;
+  --maxw:860px;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0e1319; --surface:#151b23; --surface-2:#1c242e; --fg:#e7ecf1; --muted:#9aa6b4;
+  --border:#283440; --accent:#2fd4c2; --accent-weak:#113a37; --accent-fg:#5fe3d4;
+  --ok:#49c17e; --warn:#e0b24d; --crit:#f07d7d; --code:#8fe9df; color-scheme:dark;
+}}
+:root[data-theme="dark"]{
+  --bg:#0e1319; --surface:#151b23; --surface-2:#1c242e; --fg:#e7ecf1; --muted:#9aa6b4;
+  --border:#283440; --accent:#2fd4c2; --accent-weak:#113a37; --accent-fg:#5fe3d4;
+  --ok:#49c17e; --warn:#e0b24d; --crit:#f07d7d; --code:#8fe9df; color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--sans);line-height:1.6;
+  font-size:15px;-webkit-font-smoothing:antialiased;margin:0}
+.wrap{display:grid;grid-template-columns:260px minmax(0,1fr);gap:0;max-width:1240px;margin:0 auto}
+/* TOC */
+nav.toc{position:sticky;top:env(safe-area-inset-top,0px);align-self:start;height:100vh;
+  overflow-y:auto;border-right:1px solid var(--border);padding:22px 14px 40px 14px;
+  background:var(--surface)}
+nav.toc .brand{font-family:var(--display);font-weight:600;font-size:15px;letter-spacing:.01em;
+  padding:0 8px 2px}
+nav.toc .sub{color:var(--muted);font-size:11.5px;padding:0 8px 14px;text-transform:uppercase;letter-spacing:.08em}
+nav.toc a{display:block;color:var(--muted);text-decoration:none;font-size:12.8px;
+  padding:5px 8px;border-radius:7px;line-height:1.35}
+nav.toc a:hover{background:var(--surface-2);color:var(--fg)}
+nav.toc a .n{color:var(--accent-fg);font-variant-numeric:tabular-nums;font-weight:600;margin-right:7px}
+main{padding:40px max(22px,env(safe-area-inset-right,0px)) 90px max(26px,env(safe-area-inset-left,0px));
+  min-width:0;max-width:calc(var(--maxw) + 48px)}
+/* Hero */
+.hero{border:1px solid var(--border);border-radius:14px;padding:26px 26px 22px;
+  background:linear-gradient(160deg,var(--surface),var(--bg));margin-bottom:34px}
+.eyebrow{font-family:var(--mono);font-size:11.5px;text-transform:uppercase;letter-spacing:.14em;
+  color:var(--accent-fg);margin:0 0 10px}
+h1{font-family:var(--display);font-size:30px;line-height:1.12;margin:0 0 10px;text-wrap:balance;font-weight:600}
+.hero p{margin:0 0 6px;color:var(--muted);max-width:60ch}
+.hero .meta{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}
+.chip{font-family:var(--mono);font-size:11.5px;border:1px solid var(--border);border-radius:999px;
+  padding:4px 11px;color:var(--muted);background:var(--bg)}
+.chip.ac{color:var(--accent-fg);border-color:var(--accent);background:var(--accent-weak)}
+section{scroll-margin-top:18px;margin:0 0 14px;border-top:1px solid var(--border);padding-top:30px}
+section:first-of-type{border-top:0;padding-top:0}
+h2{font-family:var(--display);font-size:22px;margin:4px 0 4px;font-weight:600;text-wrap:balance;line-height:1.2}
+h2 .ph{font-family:var(--mono);font-size:12px;color:var(--accent-fg);display:block;letter-spacing:.1em;
+  text-transform:uppercase;margin-bottom:3px;font-weight:500}
+h3{font-family:var(--display);font-size:16.5px;margin:26px 0 8px;font-weight:600}
+h4{font-size:13.5px;margin:18px 0 6px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+p{margin:10px 0}
+.lead{font-size:16px;color:var(--fg)}
+ul,ol{padding-left:22px;margin:10px 0}
+li{margin:4px 0}
+code{font-family:var(--mono);font-size:.86em;background:var(--surface-2);padding:1.5px 5px;border-radius:5px;color:var(--code)}
+strong{font-weight:650}
+a{color:var(--accent-fg)}
+.note{border-left:3px solid var(--accent);background:var(--accent-weak);padding:12px 15px;
+  border-radius:0 9px 9px 0;margin:16px 0;font-size:14px}
+.note.warn{border-left-color:var(--warn);background:color-mix(in srgb,var(--warn) 12%,var(--bg))}
+.note .lbl{font-family:var(--mono);font-size:11px;text-transform:uppercase;letter-spacing:.1em;
+  display:block;margin-bottom:4px;color:var(--accent-fg);font-weight:600}
+.note.warn .lbl{color:var(--warn)}
+.tw{overflow-x:auto;margin:16px 0;border:1px solid var(--border);border-radius:10px}
+table{border-collapse:collapse;width:100%;font-size:13px;min-width:540px}
+th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--border);vertical-align:top}
+th{background:var(--surface-2);font-weight:600;font-size:11.5px;text-transform:uppercase;
+  letter-spacing:.04em;color:var(--muted);position:sticky;top:0}
+tbody tr:last-child td{border-bottom:0}
+td code{white-space:nowrap}
+.tag{font-family:var(--mono);font-size:10.5px;padding:2px 7px;border-radius:5px;white-space:nowrap;display:inline-block}
+.tag.must{background:var(--accent-weak);color:var(--accent-fg)}
+.tag.opt{background:var(--surface-2);color:var(--muted)}
+.tag.ok{background:color-mix(in srgb,var(--ok) 16%,var(--bg));color:var(--ok)}
+.tag.part{background:color-mix(in srgb,var(--warn) 18%,var(--bg));color:var(--warn)}
+.tag.no{background:color-mix(in srgb,var(--crit) 15%,var(--bg));color:var(--crit)}
+.mer{overflow-x:auto;margin:18px 0;border:1px solid var(--border);border-radius:10px;
+  background:var(--surface);padding:14px}
+pre.mermaid{margin:0;text-align:center;min-width:480px}
+figcaption{font-size:12.5px;color:var(--muted);margin-top:6px;font-style:italic}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:16px 0}
+.card{border:1px solid var(--border);border-radius:11px;padding:15px 17px;background:var(--surface)}
+.card h4{margin-top:0}
+.kv{font-family:var(--mono);font-size:12px;color:var(--muted)}
+hr.soft{border:0;border-top:1px dashed var(--border);margin:22px 0}
+.foot{color:var(--muted);font-size:13px;margin-top:40px;border-top:1px solid var(--border);padding-top:18px}
+@media (max-width:820px){
+  .wrap{grid-template-columns:1fr}
+  nav.toc{position:static;height:auto;border-right:0;border-bottom:1px solid var(--border);
+    display:flex;flex-wrap:wrap;gap:2px 4px;padding:14px max(16px,env(safe-area-inset-left,0px))}
+  nav.toc .brand,nav.toc .sub{width:100%}
+  nav.toc a{font-size:12px;padding:4px 8px}
+  main{padding:26px max(16px,env(safe-area-inset-right,0px)) 70px max(16px,env(safe-area-inset-left,0px))}
+  .cols{grid-template-columns:1fr}
+  h1{font-size:25px}
+}
+</style>
+
+<div class="wrap">
+<nav class="toc">
+  <div class="brand">Brendo — Technical Blueprint</div>
+  <div class="sub">Sprinto · AI Case 2 (B2)</div>
+  <a href="#understanding"><span class="n">01</span>Project understanding</a>
+  <a href="#problem"><span class="n">02</span>Problem statement</a>
+  <a href="#build"><span class="n">03</span>What we build</a>
+  <a href="#structure"><span class="n">04</span>The "9" + 7-step pipeline</a>
+  <a href="#stack"><span class="n">05</span>Technology stack</a>
+  <a href="#features"><span class="n">06</span>Feature breakdown</a>
+  <a href="#components"><span class="n">07</span>Component map</a>
+  <a href="#arch"><span class="n">08</span>High-level architecture</a>
+  <a href="#impl"><span class="n">09</span>Implementation architecture</a>
+  <a href="#data-api"><span class="n">10</span>Data flow &amp; API</a>
+  <a href="#ai"><span class="n">11</span>AI / agent architecture</a>
+  <a href="#db"><span class="n">12</span>Database design</a>
+  <a href="#repo"><span class="n">13</span>Repository structure</a>
+  <a href="#roadmap"><span class="n">14</span>Development roadmap</a>
+  <a href="#testing"><span class="n">15</span>Testing strategy</a>
+  <a href="#risks"><span class="n">16</span>Risks &amp; open questions</a>
+</nav>
+
+<main>
+  <div class="hero">
+    <p class="eyebrow">Technical blueprint · for review before build</p>
+    <h1>Brendo: an automated, defensible cold-outreach pipeline for Sprinto</h1>
+    <p class="lead">A repeatable system that takes a list of company domains and, end-to-end, finds the right-fit companies, finds the right person, and drafts &amp; sends a personalised cold email — with every decision recorded so it can be defended.</p>
+    <div class="meta">
+      <span class="chip ac">Source of truth: 2 documents</span>
+      <span class="chip">Brief: "Cold Outreach, at Scale"</span>
+      <span class="chip">Deck: "L4 — Data Acquisition &amp; Agent Loops" (42 slides)</span>
+      <span class="chip">As of 14 Nov 2026</span>
+    </div>
+  </div>
+
+  <div class="note">
+    <span class="lbl">How to read this document</span>
+    Everything marked <strong>[DOC]</strong> is taken directly from the two source documents. Everything marked <strong>[PROPOSED]</strong> is my engineering recommendation filling a gap the documents leave open — these are the parts to review and approve. I have not changed any technology the documents name; where I suggest an alternative, it is called out separately, never substituted silently.
+  </div>
+
+  <!-- 01 -->
+  <section id="understanding">
+    <h2><span class="ph">Phase 1</span>Project understanding</h2>
+    <p class="lead">Brendo is your project codename for the assignment the documents call <strong>"AI Case 2 / B2 — Cold Outreach, at Scale."</strong> The word "Brendo" does not appear in either document; the rest of this blueprint maps your codename onto their terminology and keeps their original terms.</p>
+
+    <h3>The two documents, side by side</h3>
+    <div class="tw"><table>
+      <thead><tr><th>Document</th><th>Purpose</th><th>What it gives us</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Sprinto.pdf</strong><br><span class="kv">2 pages — the brief</span></td>
+          <td>The actual assignment. States the situation, the ask, and the acceptance bar.</td>
+          <td>The business problem, the 7-step pipeline to build, the Step-4 PoC options (Hunter.io / Apollo), the Gmail send rule, and the "what done looks like" test.</td></tr>
+        <tr><td><strong>Sprinto 1.pdf</strong><br><span class="kv">42 pages — the teaching deck</span><br>"L4: Data Acquisition &amp; Agent Loops"</td>
+          <td>The conceptual foundation and the design rules the build is graded against.</td>
+          <td>Scraping as a 5-step pipeline, request vs browser fetch, rule/heuristic/model extraction, cost control, scraping law/ethics, the <strong>adaptive agent loop</strong>, the <strong>Nine Checks</strong>, the <strong>5 pre-build decisions</strong>, and the <strong>Evidence Map</strong> that defines Sprinto's ICP.</td></tr>
+      </tbody>
+    </table></div>
+
+    <h3>Consolidated understanding — in plain language</h3>
+    <div class="cols">
+      <div class="card"><h4>What is Brendo?</h4><p>An automated outbound-research-and-drafting pipeline. Input: a list of company domains. Output: for each qualified company, a personalised cold email addressed to a real decision-maker, landed in your own inbox, plus a written trail of why.</p></div>
+      <div class="card"><h4>What problem are we solving?</h4><p>Sprinto's Growth Lead spends 15–20 min per company researching and writing a first email by hand. At 8–15 companies/week, quality drops toward the end of the list — the research, not the writing, is what doesn't scale.</p></div>
+      <div class="card"><h4>Why does this need AI?</h4><p>The signal that qualifies a company (is it SaaS? what stage? any compliance pressure?) lives in unstructured prose on the company's own pages — published but not queryable. A model reads meaning across varied, unseen sites; rigid rules can't.</p></div>
+      <div class="card"><h4>Who uses it?</h4><p>Sprinto's <strong>Growth Lead</strong>. Her role shifts from <em>researcher-and-writer</em> to <em>reviewer-and-sender</em>: she supplies the domain list and approves before any real send.</p></div>
+      <div class="card"><h4>What does it do when run?</h4><p>Runs the 7 steps per domain without a human deciding at each step: scrape → extract → qualify (with a loop that fetches more when unsure) → find PoC → find pain points → draft → send to self.</p></div>
+      <div class="card"><h4>What does success look like?</h4><p>A personalised email lands in your inbox, addressed by name, with a hook a human would reply to — <strong>and</strong> you can defend every decision the system made. If the Growth Lead would redo the work, it has failed.</p></div>
+    </div>
+
+    <h3>Requirements extracted from the documents</h3>
+    <h4>Functional requirements [DOC]</h4>
+    <ol>
+      <li><strong>FR1</strong> — Accept a list of domains and run end-to-end, repeatably, with no human decision at each step.</li>
+      <li><strong>FR2</strong> — Scrape a prospect's website for raw signal (single-fetch scraper).</li>
+      <li><strong>FR3</strong> — Extract structured company data from the raw content.</li>
+      <li><strong>FR4</strong> — Qualify the company against Sprinto's ICP, <em>with an agent loop</em> that fetches more information when the initial data is insufficient.</li>
+      <li><strong>FR5</strong> — Find the right point of contact (PoC) at the company.</li>
+      <li><strong>FR6</strong> — Identify the <strong>two</strong> most likely pain points for that person.</li>
+      <li><strong>FR7</strong> — Draft a personalised cold email addressed to them by name, with a specific hook.</li>
+      <li><strong>FR8</strong> — Send the email via Gmail, hardcoded <code>to:</code> your own address.</li>
+      <li><strong>FR9</strong> — Record the reasoning behind every decision (why this company, why this person, why this email).</li>
+      <li><strong>FR10</strong> — On failure, log the reason and continue to the next company (degrade gracefully).</li>
+    </ol>
+    <h4>Non-functional requirements [DOC + interpretation]</h4>
+    <ul>
+      <li><strong>Defensibility</strong> [DOC] — every decision explainable; this is half the acceptance bar.</li>
+      <li><strong>Cost control</strong> [DOC] — clean before you reason; cheap model where it suffices; don't re-research a company (cache). ~$0.01–$0.20 per 200 companies is achievable.</li>
+      <li><strong>Bounded loops</strong> [DOC] — a maximum iteration count set <em>before</em> build; worst case 4 fetches beyond the homepage.</li>
+      <li><strong>Legality &amp; ethics</strong> [DOC] — check <code>robots.txt</code> and ToS; single-fetch only; no login/CAPTCHA bypass; mind GDPR/DPDP for personal data.</li>
+      <li><strong>Human boundary</strong> [DOC] — no email reaches a real prospect without Growth-Lead review (send is to self in this build).</li>
+      <li><strong>Resilience</strong> [interpretation] — per-company isolation; one site failing never stops the batch.</li>
+    </ul>
+    <h4>Deliverables &amp; evaluation [DOC]</h4>
+    <p>The build is graded on the "Assessment Frame" (slides 32, 35): <strong>(1)</strong> a personalised email lands in your inbox addressed to a real person with a credible hook; <strong>(2)</strong> every decision is defensible. The named failure mode is "a pipeline that runs without judgment" — qualifying every company, sending every email, grabbing the nearest "manager."</p>
+    <h4>Constraints, dependencies, assumptions</h4>
+    <ul>
+      <li>[DOC] PoC data via Hunter.io (API, 25 free searches/month) <em>or</em> Apollo (web UI only → look up manually and hardcode).</li>
+      <li>[DOC] Send is hardcoded to your own inbox — no real-world send risk in this build.</li>
+      <li>[ASSUMPTION] "Right companies" is <strong>your</strong> definition to arrive at through research — the Evidence Map (slide 40) is the explicit answer the deck provides; this blueprint treats it as the ICP spec.</li>
+      <li>[ASSUMPTION] An LLM API and a Gmail account/credentials are available; the exact model is left to us (the deck prices it per-token, vendor-neutral).</li>
+    </ul>
+  </section>
+
+  <!-- 02 -->
+  <section id="problem">
+    <h2><span class="ph">Phase 11 · item 2</span>Exact problem statement</h2>
+    <p class="lead">Manual outbound research does not scale and degrades under fatigue. The constraint is no longer the thinking (reasoning is now cheap) — it is acquiring clean, structured input about which companies are at the right stage and who to contact, from data that is published but not queryable.</p>
+    <div class="note">
+      <span class="lbl">One-sentence framing</span>
+      Build a repeatable pipeline that converts a list of domains into qualified, personalised, defensible first-touch emails — automatically — so the Growth Lead reviews and sends instead of researching and writing.
+    </div>
+  </section>
+
+  <!-- 03 -->
+  <section id="build">
+    <h2><span class="ph">Phase 11 · item 3</span>What we are expected to build</h2>
+    <p>A <strong>7-step pipeline</strong> [DOC], run by an orchestrator over a domain list, where step 3 contains an <strong>adaptive agent loop</strong>.</p>
+    <figure class="mer"><pre class="mermaid">
+flowchart TD
+  IN["Domain list (CSV)"] --> S1
+  S1["1 · Scrape website<br/>raw signal (single-fetch)"] --> S2
+  S2["2 · Extract<br/>structured company data"] --> S3
+  S3{"3 · Qualify vs ICP<br/>agent loop"}
+  S3 -->|needs more info<br/>under cap| FETCH["Fetch next named source<br/>careers / pricing / customers / trust"]
+  FETCH --> S2
+  S3 -->|disqualified or cap hit| DROP["Drop / flag for human"]
+  S3 -->|qualified| S4
+  S4["4 · Find PoC<br/>Hunter.io or Apollo"] --> S5
+  S5["5 · Two pain points<br/>for that person"] --> S6
+  S6["6 · Draft email<br/>by name + specific hook"] --> S7
+  S7["7 · Send via Gmail<br/>to: your own inbox"]
+  S1 & S2 & S3 & S4 & S5 & S6 -.record reasoning.-> LOG[("Decision log")]
+</pre><figcaption>The 7-step pipeline. Step 3 is the only step that loops; everything else runs once per company.</figcaption></figure>
+  </section>
+
+  <!-- 04 -->
+  <section id="structure">
+    <h2><span class="ph">Phase 2</span>The "nine" structure — and the real backbone</h2>
+    <div class="note warn">
+      <span class="lbl">Honest reading of the brief</span>
+      Neither document contains a "nine-slide structure." The structural backbone is the <strong>7-step pipeline</strong> (above). The only genuine set of nine is <strong>"The Nine Checks"</strong> (deck slides 34–35) — a go/no-go gate on whether the system deserves to be built. I analyse both below rather than invent nine slides. If by "nine slides" you meant a specific deliverable deck, tell me and I'll remap.
+    </div>
+
+    <h3>A · The Nine Checks — does this deserve to be built?</h3>
+    <div class="tw"><table>
+      <thead><tr><th>#</th><th>Check</th><th>Group</th><th>Verdict [DOC]</th><th>Technical implication</th></tr></thead>
+      <tbody>
+        <tr><td>01</td><td>Problem real?</td><td>Kill switch</td><td><span class="tag ok">YES</span></td><td>Worth automating; proceed.</td></tr>
+        <tr><td>02</td><td>Workflow repeated?</td><td>Kill switch</td><td><span class="tag ok">YES</span></td><td>Same weekly process → a batch pipeline, not a one-off.</td></tr>
+        <tr><td>03</td><td>Input available?</td><td>Kill switch</td><td><span class="tag ok">YES</span></td><td>Public sites + Hunter/Apollo → scraper + contact API.</td></tr>
+        <tr><td>04</td><td>Output valuable?</td><td>Sizing</td><td><span class="tag ok">YES</span></td><td>A qualified lead + draft is directly actionable.</td></tr>
+        <tr><td>05</td><td>Impact measurable?</td><td>Sizing</td><td><span class="tag ok">YES</span></td><td>Instrument time/company, rewrite rate, conversion.</td></tr>
+        <tr><td>06</td><td>ROI worth it?</td><td>Sizing</td><td><span class="tag ok">YES</span></td><td>Keep per-company cost near $0.001 (cost dials).</td></tr>
+        <tr><td>07</td><td>Failure risk OK?</td><td>Boundary</td><td><span class="tag part">PARTIAL</span></td><td>Send to own inbox only; flag stale PoC data.</td></tr>
+        <tr><td>08</td><td>Judgment protected?</td><td>Boundary</td><td><span class="tag part">PARTIAL</span></td><td>You set ICP; model applies it; human reviews before real send.</td></tr>
+        <tr><td>09</td><td>Owner clear?</td><td>Boundary</td><td><span class="tag ok">YES</span></td><td>Growth Lead owns output + send decision.</td></tr>
+      </tbody>
+    </table></div>
+    <p><strong>The Cut [DOC]:</strong> checks 07 and 08 land in the Boundary column. The designed limit is explicit — <em>no email goes to a real prospect without human review</em>. The system handles research and drafting; the Growth Lead handles send. This is a hard architectural requirement, not a nicety.</p>
+
+    <h3>B · The 7-step pipeline — the build spec</h3>
+    <div class="tw"><table>
+      <thead><tr><th>Step</th><th>Objective</th><th>Key requirements [DOC]</th><th>Technical component</th><th>Expected output</th></tr></thead>
+      <tbody>
+        <tr><td>1 Scrape</td><td>Get raw signal from the site</td><td>Single-fetch; check <code>robots.txt</code>; browser fallback only if JS-rendered</td><td>Scraper</td><td>Raw HTML / page text</td></tr>
+        <tr><td>2 Extract</td><td>Impose structure</td><td>Clean first (strip nav/footer/cookie, dedupe, cap ~2k tokens), then extract named fields</td><td>Cleaner + LLM Extractor</td><td>Structured company record (JSON)</td></tr>
+        <tr><td>3 Qualify</td><td>Fit vs ICP</td><td>Agent loop; code checks fields are filled; fetch named source when missing; iteration cap; short-circuits</td><td>Qualifier + Loop controller</td><td>qualify / disqualify / flag + reasons</td></tr>
+        <tr><td>4 Find PoC</td><td>Right decision-maker</td><td>Hunter.io API <em>or</em> hardcoded Apollo lookup</td><td>PoC Finder</td><td>Name, role, email</td></tr>
+        <tr><td>5 Pain points</td><td>What they struggle with</td><td>Exactly two, specific to person/role + company signal</td><td>LLM Pain-point ID</td><td>Two pain points + evidence</td></tr>
+        <tr><td>6 Draft</td><td>Personalised email</td><td>By name; one specific hook; human-credible</td><td>LLM Email Drafter</td><td>Subject + body (JSON)</td></tr>
+        <tr><td>7 Send</td><td>Deliver</td><td>Gmail; hardcode <code>to:</code> self</td><td>Email Sender</td><td>Email in your inbox</td></tr>
+      </tbody>
+    </table></div>
+    <p><strong>The narrative:</strong> steps 1–2 acquire and structure; step 3 is the intelligence (it decides when it knows enough); steps 4–6 turn a qualified company into a person-specific message; step 7 delivers. Defensibility (FR9) threads through every step — each writes <em>why</em> to the decision log.</p>
+  </section>
+
+  <!-- 05 -->
+  <section id="stack">
+    <h2><span class="ph">Phase 3</span>Technology stack</h2>
+    <p class="lead">The documents specify a <strong>deliberately thin, vendor-neutral</strong> stack: a single-fetch scraper, a cleaning step, an LLM for the reasoning steps, Hunter.io <em>or</em> Apollo for contacts, and Gmail for sending. Everything else (language, orchestration, storage) is left to us. I preserve the named choices and label my fill-ins as [PROPOSED].</p>
+
+    <div class="tw"><table>
+      <thead><tr><th>Layer</th><th>Technology</th><th>Purpose</th><th>Why required</th><th>Integrates with</th></tr></thead>
+      <tbody>
+        <tr><td>Contacts (PoC)</td><td><strong>Hunter.io</strong> Domain Search API <span class="tag must">DOC</span></td><td>Find the decision-maker's name + email from a domain</td><td>Named in brief as Option A; free tier, 25/mo, real API access</td><td>Step 4; called by PoC Finder</td></tr>
+        <tr><td>Contacts (PoC)</td><td><strong>Apollo.io</strong> <span class="tag opt">DOC · Option B</span></td><td>Manual PoC lookup, hardcoded input</td><td>Named fallback; web UI only, no API on free tier</td><td>Step 4; bypasses live lookup</td></tr>
+        <tr><td>Sending</td><td><strong>Gmail</strong> <span class="tag must">DOC</span></td><td>Send the drafted email</td><td>Step 7 names it explicitly; <code>to:</code> hardcoded to self</td><td>Step 7; Email Sender</td></tr>
+        <tr><td>AI / LLM</td><td><strong>An LLM</strong> (vendor left open) <span class="tag must">DOC</span></td><td>Extract, qualify, pain points, draft</td><td>Deck requires model-based extraction + reasoning; prices it per-token</td><td>Steps 2,3,5,6</td></tr>
+        <tr><td>Scraping — fetch</td><td>Request-based (HTTP) + headless-browser fallback <span class="tag must">DOC</span></td><td>Get the page text</td><td>Deck: single-fetch request first; browser only when JS-rendered (10–50× cost)</td><td>Step 1</td></tr>
+        <tr><td>Scraping — clean</td><td>Rule/heuristic cleaning <span class="tag must">DOC</span></td><td>Strip noise, cap tokens</td><td>Deck: cleaning is where pipelines fail; garbage in = garbage out</td><td>Between steps 1–2</td></tr>
+        <tr><td>Storage / cache</td><td>SQLite / local store <span class="tag opt">PROPOSED</span></td><td>Cache cleaned pages + results + decision log</td><td>Deck's 3rd cost dial: "don't research the same company twice"; also holds FR9 audit trail</td><td>All steps</td></tr>
+        <tr><td>Language / runtime</td><td>Python 3.11 <span class="tag opt">PROPOSED</span></td><td>Pipeline implementation</td><td>Best ecosystem for scraping (<code>httpx</code>, <code>selectolax</code>/<code>BeautifulSoup</code>, <code>playwright</code>) + LLM SDKs</td><td>Everything</td></tr>
+        <tr><td>Orchestration</td><td>Plain Python functions + a run loop <span class="tag opt">PROPOSED</span></td><td>Sequence the 7 steps per domain</td><td>Deck warns against unnecessary agents; a simple loop + one in-step loop is enough</td><td>All steps</td></tr>
+        <tr><td>LLM structure</td><td>JSON-schema / structured outputs <span class="tag opt">PROPOSED</span></td><td>Force named fields; validate in code</td><td>Design rule (slide 30): check fields in code, not by asking the model</td><td>Steps 2,3,5,6</td></tr>
+        <tr><td>Interface</td><td>CLI <span class="tag opt">PROPOSED</span></td><td>Run on a domain list; print a report</td><td>Matches "run it on a list of domains"; no UI required for this build</td><td>Entry point</td></tr>
+        <tr><td>Deployment</td><td>Local / single machine <span class="tag opt">PROPOSED</span></td><td>Run on demand</td><td>Scope is a build, not a hosted product; continuous running is explicitly "a scheduler," out of scope</td><td>—</td></tr>
+      </tbody>
+    </table></div>
+
+    <div class="note">
+      <span class="lbl">Named but NOT mandated</span>
+      The deck surveys scraping vendors as market context, not requirements: <em>Firecrawl / Jina Reader</em> (cleaning-as-a-service), <em>ScrapingBee / ZenRows / Zyte / Bright Data</em> (unblocking), <em>Apify / Oxylabs / Diffbot</em> (parse/extract). These are <strong>optional</strong> upgrades. For a single-fetch build over cooperative sites, a plain request + heuristic cleaning is sufficient and cheapest; reach for Firecrawl/ZenRows only if you hit JS-rendering or bot-detection on real targets.
+    </div>
+    <div class="note warn">
+      <span class="lbl">Where I would deviate — stated, not silent</span>
+      The documents leave language and model open. My recommendation is Python + a current, capable LLM for the reasoning steps and a cheaper/smaller model for high-volume extraction (the deck's "which model reads it" cost dial). If you have a required model or language, name it and I will conform the plan.
+    </div>
+  </section>
+
+  <!-- 06 -->
+  <section id="features">
+    <h2><span class="ph">Phase 4</span>Feature breakdown &amp; traceability</h2>
+    <h3>Feature groups</h3>
+    <div class="cols">
+      <div class="card"><h4>Core MVP</h4><ul><li>Domain-list runner (batch)</li><li>Single-fetch scraper + robots check</li><li>Cleaner (noise strip, token cap)</li><li>Structured extractor</li><li>ICP qualifier + adaptive loop</li><li>PoC finder (Hunter/Apollo)</li><li>Email drafter</li><li>Gmail sender (to self)</li></ul></div>
+      <div class="card"><h4>Supporting</h4><ul><li>Cache (skip re-research)</li><li>Decision log / audit trail</li><li>Per-company error isolation + failure-reason log</li><li>Batch summary report</li><li>Config file for ICP thresholds</li></ul></div>
+      <div class="card"><h4>AI-powered</h4><ul><li>Model-based field extraction</li><li>Confidence/field-completeness gating</li><li>ICP qualification reasoning</li><li>Two-pain-point inference</li><li>Personalised hook + email generation</li></ul></div>
+      <div class="card"><h4>Future (out of scope) [DOC]</h4><ul><li>More signals (jobs, news, filings)</li><li>CRM / email-history integration</li><li>Self-sharpening ICP from conversions</li><li>Continuous scheduled runs</li><li>Landing in CRM, not an inbox</li></ul></div>
+    </div>
+    <p class="kv">The deck (slides 41–42) notes most "future" items are <em>work, not difficulty</em>; the real moat is customer-proprietary data (call recordings, CRM, usage) and accumulated outcome data — neither is in scope here.</p>
+
+    <h3>Requirement → component traceability</h3>
+    <div class="tw"><table>
+      <thead><tr><th>Req</th><th>Feature</th><th>Component</th><th>Acceptance criteria</th></tr></thead>
+      <tbody>
+        <tr><td>FR1</td><td>Batch run</td><td>Orchestrator</td><td>Runs a CSV of domains end-to-end with no per-step prompt</td></tr>
+        <tr><td>FR2</td><td>Scrape</td><td>Scraper</td><td>Returns page text; respects robots.txt; browser fallback works on a JS page</td></tr>
+        <tr><td>FR3</td><td>Extract</td><td>Cleaner + Extractor</td><td>Produces the named ICP fields as JSON; empty fields are empty, not guessed</td></tr>
+        <tr><td>FR4</td><td>Qualify + loop</td><td>Qualifier</td><td>Fetches a named extra source when a field is missing; stops at the cap; applies short-circuits</td></tr>
+        <tr><td>FR5</td><td>PoC</td><td>PoC Finder</td><td>Returns a real name + role + email (or flags stale/missing)</td></tr>
+        <tr><td>FR6</td><td>Pain points</td><td>Pain-point ID</td><td>Exactly two, each tied to a scraped fact or role</td></tr>
+        <tr><td>FR7</td><td>Draft</td><td>Email Drafter</td><td>Addresses the person by name; one concrete hook; reads human</td></tr>
+        <tr><td>FR8</td><td>Send</td><td>Email Sender</td><td>Email arrives in your inbox</td></tr>
+        <tr><td>FR9</td><td>Defensibility</td><td>Decision Log</td><td>For any company: why qualified, why this person, why this email</td></tr>
+        <tr><td>FR10</td><td>Resilience</td><td>Orchestrator</td><td>One company's failure logs a reason and the batch continues</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <!-- 07 -->
+  <section id="components">
+    <h2><span class="ph">Phase 5</span>Component map</h2>
+    <div class="tw"><table>
+      <thead><tr><th>Component</th><th>Responsibility</th><th>Input → Output</th><th>Tech</th><th>Talks to</th></tr></thead>
+      <tbody>
+        <tr><td>Orchestrator</td><td>Run 7 steps per domain; batch; isolate failures; write log</td><td>domains.csv → per-company result</td><td>Python</td><td>All</td></tr>
+        <tr><td>Scraper</td><td>robots check; single-fetch; headless fallback</td><td>URL → raw HTML/text</td><td>httpx + playwright</td><td>Cleaner, Cache</td></tr>
+        <tr><td>Cleaner</td><td>Strip noise, dedupe, cap ~2k tokens</td><td>raw HTML → clean text</td><td>selectolax/heuristics</td><td>Extractor</td></tr>
+        <tr><td>Extractor</td><td>Fill named ICP fields</td><td>clean text → company JSON</td><td>LLM (structured)</td><td>Qualifier</td></tr>
+        <tr><td>Qualifier + Loop</td><td>Field-completeness check; fetch more; cap; short-circuits; verdict</td><td>company JSON → verdict + reasons</td><td>Python + LLM</td><td>Scraper, PoC Finder, Log</td></tr>
+        <tr><td>PoC Finder</td><td>Resolve decision-maker</td><td>domain → contact</td><td>Hunter.io API / Apollo</td><td>Pain-point ID</td></tr>
+        <tr><td>Pain-point ID</td><td>Two likely pains for the person</td><td>company+contact → 2 pains</td><td>LLM</td><td>Email Drafter</td></tr>
+        <tr><td>Email Drafter</td><td>Subject + personalised body + hook</td><td>contact+pains → email JSON</td><td>LLM (structured)</td><td>Email Sender</td></tr>
+        <tr><td>Email Sender</td><td>Send to self</td><td>email JSON → sent message</td><td>Gmail API/SMTP</td><td>Gmail</td></tr>
+        <tr><td>Cache + Decision Log</td><td>Persist pages, results, reasons</td><td>reads/writes</td><td>SQLite</td><td>All</td></tr>
+        <tr><td>ICP Config</td><td>Evidence Map as fields + thresholds</td><td>static config</td><td>YAML/JSON</td><td>Extractor, Qualifier</td></tr>
+      </tbody>
+    </table></div>
+
+    <h3>Component architecture diagram</h3>
+    <figure class="mer"><pre class="mermaid">
+flowchart TB
+  subgraph Entry
+    CLI["CLI runner"] --> ORCH["Orchestrator"]
+    CFG["ICP config<br/>(Evidence Map)"] -.-> ORCH
+  end
+  subgraph Acquire
+    ORCH --> SCR["Scraper<br/>single-fetch + headless"]
+    SCR --> CLN["Cleaner"]
+  end
+  subgraph Reason
+    CLN --> EXT["LLM Extractor"]
+    EXT --> QL["Qualifier + Loop"]
+    QL -->|need source| SCR
+    QL --> PP["Pain-point ID"]
+    PP --> DR["Email Drafter"]
+  end
+  subgraph Act
+    QL --> POC["PoC Finder"]
+    POC --> PP
+    DR --> SND["Email Sender"]
+    SND --> GM["Gmail"]
+  end
+  POChelp["Hunter.io / Apollo"] --- POC
+  LLM["LLM API"] -.-> EXT & QL & PP & DR
+  STORE[("SQLite: cache + decision log")]
+  ORCH <--> STORE
+  QL -.-> STORE
+  SCR -.cache.-> STORE
+</pre><figcaption>Four roles: Acquire (get data), Reason (LLM steps), Act (contacts + send), with a store crosscutting all of them.</figcaption></figure>
+
+    <h3>Dependency matrix</h3>
+    <div class="tw"><table>
+      <thead><tr><th>↓ depends on →</th><th>Scraper</th><th>Cleaner</th><th>Extractor</th><th>Qualifier</th><th>PoC</th><th>Store</th><th>LLM</th></tr></thead>
+      <tbody>
+        <tr><td>Orchestrator</td><td>✓</td><td>✓</td><td>✓</td><td>✓</td><td>✓</td><td>✓</td><td></td></tr>
+        <tr><td>Cleaner</td><td>✓</td><td>—</td><td></td><td></td><td></td><td></td><td></td></tr>
+        <tr><td>Extractor</td><td></td><td>✓</td><td>—</td><td></td><td></td><td></td><td>✓</td></tr>
+        <tr><td>Qualifier</td><td>✓ (re-fetch)</td><td>✓</td><td>✓</td><td>—</td><td></td><td>✓</td><td>✓</td></tr>
+        <tr><td>PoC Finder</td><td></td><td></td><td></td><td>✓</td><td>—</td><td>✓</td><td></td></tr>
+        <tr><td>Pain + Draft</td><td></td><td></td><td>✓</td><td>✓</td><td>✓</td><td>✓</td><td>✓</td></tr>
+        <tr><td>Sender</td><td></td><td></td><td></td><td></td><td></td><td>✓</td><td></td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <!-- 08 -->
+  <section id="arch">
+    <h2><span class="ph">Phase 6 · high-level</span>System architecture</h2>
+    <figure class="mer"><pre class="mermaid">
+flowchart LR
+  USER(["Growth Lead"]) -->|domains.csv| ORCH["Orchestrator (CLI)"]
+  ORCH --> ACQ["Acquisition<br/>scrape + clean"]
+  ACQ --> RSN["Reasoning<br/>extract · qualify-loop · pains · draft"]
+  RSN --> ACT["Action<br/>PoC lookup + Gmail send"]
+  ACT -->|email| INBOX([Your inbox])
+  RSN -.-> EXT1["LLM API"]
+  ACT -.-> EXT2["Hunter.io / Apollo"]
+  ACT -.-> EXT3["Gmail"]
+  ORCH <--> DB[("SQLite<br/>cache + decision log")]
+  ORCH -->|batch report| USER
+</pre><figcaption>Three internal stages between the Growth Lead and her inbox, with three external services and one store.</figcaption></figure>
+  </section>
+
+  <!-- 09 -->
+  <section id="impl">
+    <h2><span class="ph">Phase 6 · detailed</span>End-to-end implementation architecture</h2>
+    <ol>
+      <li><strong>Entry.</strong> The Growth Lead runs the CLI with a CSV of domains. No further input per company.</li>
+      <li><strong>Per company, check cache.</strong> If researched recently, reuse the stored result (cost dial #3) and skip to reporting.</li>
+      <li><strong>Scrape.</strong> Read <code>robots.txt</code>; single-fetch the homepage. If the text arrives empty (JS shell), retry with a headless browser. On block/failure, log the reason and continue.</li>
+      <li><strong>Clean.</strong> Strip nav/footer/cookie banners, dedupe, keep hero/product/about, cap ~2,000 tokens.</li>
+      <li><strong>Extract.</strong> LLM fills named ICP fields into JSON. Empty stays empty.</li>
+      <li><strong>Qualify (the loop).</strong> <em>Code</em> checks required fields are populated. If a field is missing and the iteration cap isn't reached, fetch the specific source that answers it (careers → stage; trust → certified; product → SaaS) and re-extract. Apply short-circuits. At the cap, hand off to a human (flag).</li>
+      <li><strong>PoC.</strong> For a qualified company, call Hunter.io (or use the hardcoded Apollo contact).</li>
+      <li><strong>Pains + draft.</strong> LLM derives two pain points from the company signal + role, then drafts a by-name email with one concrete hook.</li>
+      <li><strong>Send.</strong> Gmail delivers to your own inbox.</li>
+      <li><strong>Persist + report.</strong> Every step appends its reasoning to the decision log; a batch summary prints counts (qualified / dropped / flagged / failed).</li>
+      <li><strong>Errors &amp; retries.</strong> Network/parse errors retry once; blocks/CAPTCHA/login are not fought (deck rule) — log and move on. The batch never halts on one company.</li>
+    </ol>
+
+    <h3>Sequence — the primary journey</h3>
+    <figure class="mer"><pre class="mermaid">
+sequenceDiagram
+  actor GL as Growth Lead
+  participant OR as Orchestrator
+  participant SC as Scraper+Cleaner
+  participant LM as LLM
+  participant HU as Hunter.io
+  participant DB as Store
+  participant GM as Gmail
+  GL->>OR: run(domains.csv)
+  loop each domain
+    OR->>DB: cached recently?
+    alt not cached
+      OR->>SC: fetch + clean homepage
+      SC-->>OR: clean text
+      OR->>LM: extract named fields
+      LM-->>OR: company JSON
+      loop until fields complete or cap
+        OR->>OR: code checks fields (not the model)
+        OR->>SC: fetch next named source
+        SC-->>OR: clean text
+        OR->>LM: re-extract
+      end
+      OR->>LM: qualify vs ICP
+      LM-->>OR: verdict + reasons
+      alt qualified
+        OR->>HU: domain search
+        HU-->>OR: PoC (name, role, email)
+        OR->>LM: 2 pain points + draft email
+        LM-->>OR: email JSON
+        OR->>GM: send to self
+        GM-->>OR: sent
+      else disqualified / cap
+        OR->>DB: log reason (drop/flag)
+      end
+    end
+    OR->>DB: persist result + decision log
+  end
+  OR-->>GL: batch report (+ emails in inbox)
+</pre><figcaption>The loop inside the loop: the outer loop is per-domain; the inner loop is the adaptive fetch-more cycle, bounded by the cap.</figcaption></figure>
+  </section>
+
+  <!-- 10 -->
+  <section id="data-api">
+    <h2><span class="ph">Phase 7</span>Data flow &amp; API design</h2>
+    <h3>Data-flow diagram</h3>
+    <figure class="mer"><pre class="mermaid">
+flowchart LR
+  WWW[["Company website"]] -->|raw HTML| R["Request / Parse"]
+  R -->|DOM text| C["Clean → ~2k tokens"]
+  C -->|clean signal| E["Extract → fields"]
+  E -->|company record| Q["Qualify"]
+  HUN[["Hunter.io"]] -->|contact| P["PoC"]
+  Q -->|qualified| P
+  P --> M["Pains + Email"]
+  M -->|email JSON| GM[["Gmail"]]
+  E -.-> DL[("Decision log")]
+  Q -.-> DL
+  P -.-> DL
+  M -.-> DL
+  C -.cleaned page.-> CA[("Page cache")]
+</pre><figcaption>Data is progressively narrowed: ~15k tokens of raw markup → ~2k clean → a handful of named fields → a verdict → one email.</figcaption></figure>
+
+    <h3>Internal APIs <span class="tag opt">PROPOSED</span></h3>
+    <p>For a CLI build these are module functions, not HTTP endpoints — listed as contracts. If a thin API/UI is added later they map to routes.</p>
+    <div class="tw"><table>
+      <thead><tr><th>Function / route</th><th>Call</th><th>Purpose</th><th>Input</th><th>Output</th></tr></thead>
+      <tbody>
+        <tr><td><code>run_batch</code></td><td>POST /run</td><td>Run the pipeline over a list</td><td><code>{domains[]}</code></td><td><code>{run_id, summary}</code></td></tr>
+        <tr><td><code>scrape</code></td><td>—</td><td>Fetch + clean one page</td><td><code>{url, use_browser?}</code></td><td><code>{text, source, status}</code></td></tr>
+        <tr><td><code>extract</code></td><td>—</td><td>Fields from clean text</td><td><code>{text}</code></td><td><code>{company_fields}</code></td></tr>
+        <tr><td><code>qualify</code></td><td>—</td><td>Verdict + loop control</td><td><code>{company_fields}</code></td><td><code>{verdict, reasons, fetches}</code></td></tr>
+        <tr><td><code>find_poc</code></td><td>GET /poc</td><td>Resolve contact</td><td><code>{domain}</code></td><td><code>{name, role, email, confidence}</code></td></tr>
+        <tr><td><code>draft_email</code></td><td>—</td><td>Pains + email</td><td><code>{company, contact}</code></td><td><code>{subject, body, hook, pains[2]}</code></td></tr>
+        <tr><td><code>send_email</code></td><td>POST /send</td><td>Send to self</td><td><code>{subject, body}</code></td><td><code>{message_id}</code></td></tr>
+      </tbody>
+    </table></div>
+
+    <h3>External APIs [DOC]</h3>
+    <div class="tw"><table>
+      <thead><tr><th>API</th><th>Purpose</th><th>Auth</th><th>Limits / notes</th></tr></thead>
+      <tbody>
+        <tr><td>Hunter.io Domain Search</td><td>PoC name + email</td><td>API key</td><td>Free: 25 searches/month — cache aggressively; a single search per qualified domain</td></tr>
+        <tr><td>Apollo.io</td><td>PoC (manual)</td><td>Account login</td><td>Free tier = web UI only; look up before the run, hardcode the contact</td></tr>
+        <tr><td>LLM API</td><td>Extract/qualify/pains/draft</td><td>API key</td><td>Priced per token; use cleaning + a cheaper model to control cost</td></tr>
+        <tr><td>Gmail</td><td>Send</td><td>OAuth / app password</td><td>Low volume; <code>to:</code> hardcoded to self this build</td></tr>
+      </tbody>
+    </table></div>
+    <p class="kv">All external endpoints above are real and named in the documents. All internal routes are <strong>proposed designs</strong>, not existing endpoints.</p>
+  </section>
+
+  <!-- 11 -->
+  <section id="ai">
+    <h2><span class="ph">Phase 8</span>AI &amp; agent architecture</h2>
+    <p class="lead">The loop is required by the brief (FR4), so an agentic step is justified — but kept minimal. The deck is explicit: don't add unnecessary agents. One bounded, single-purpose loop inside step 3 is the whole of the "agent."</p>
+
+    <h3>Deterministic logic vs LLM reasoning</h3>
+    <div class="cols">
+      <div class="card"><h4>Code decides (deterministic)</h4><ul><li>Are the required fields populated? (slide 30 rule)</li><li>Which named source to fetch next</li><li>Iteration cap / stop condition</li><li>Short-circuit rules (certified → stop; not SaaS → stop)</li><li>Cache hit / skip</li><li>Cost gating &amp; model choice</li></ul></div>
+      <div class="card"><h4>LLM decides (reasoning)</h4><ul><li>Extract facts into fields from messy prose</li><li>Judge ICP fit given the facts</li><li>Infer the two most likely pain points</li><li>Write a personalised, human-credible hook + email</li></ul></div>
+    </div>
+
+    <h3>The adaptive loop</h3>
+    <figure class="mer"><pre class="mermaid">
+flowchart TD
+  ST["Scrape homepage"] --> EX["Extract into named fields"]
+  EX --> CK{"Code: required fields filled?"}
+  CK -->|yes| QU["LLM: qualify vs ICP"]
+  CK -->|no, iterations &lt; cap| FE["Fetch next named source<br/>careers / pricing / customers / trust"]
+  FE --> EX
+  CK -->|no, cap reached| HO["Graceful handoff<br/>flag for human"]
+  QU --> SC{"Short-circuit?"}
+  SC -->|already certified| DQ["Disqualify + STOP"]
+  SC -->|not B2B SaaS| DQ
+  SC -->|stage sufficient| PA["Qualified → PoC"]
+  SC -->|2 of 3, 1 unknown| FL["Qualify-and-flag"]
+</pre><figcaption>The model makes the judgment; the code decides whether it has enough to make it. The cap turns an open-ended search into a designed handoff.</figcaption></figure>
+
+    <h3>The ICP as an Evidence Map [DOC — slide 40]</h3>
+    <p>This is the deck's explicit answer to "what are the right companies." It becomes the config that drives extraction, the loop, and qualification.</p>
+    <div class="tw"><table>
+      <thead><tr><th>Question</th><th>Fact that settles it</th><th>Where it lives</th><th>Sufficient when</th><th>Fetch limit</th><th>If unanswered</th><th>Short-circuit</th></tr></thead>
+      <tbody>
+        <tr><td>Already certified?</td><td>A named certification string / trust page</td><td>homepage footer · /security · /trust</td><td>any named cert present</td><td>1</td><td>treat as not certified, flag</td><td><span class="tag no">YES → disqualify + stop</span></td></tr>
+        <tr><td>B2B SaaS?</td><td>Product description naming a business buyer</td><td>hero · /product · /about</td><td>description names who buys it</td><td>1</td><td>manual_review</td><td><span class="tag no">NO → disqualify + stop</span></td></tr>
+        <tr><td>Right stage?</td><td>Headcount, funding stage, enterprise customers, open-role count</td><td>/careers · /pricing · /customers</td><td>funding named, OR 5+ open roles, OR enterprise pricing tier</td><td>2</td><td>qualify at lower rank, flagged</td><td>—</td></tr>
+      </tbody>
+    </table></div>
+    <p><strong>Worst case:</strong> 4 fetches beyond the homepage. The careers page is fetched first for "stage" because it answers headcount, seniority and often funding in one request.</p>
+
+    <h4>Validation &amp; anti-hallucination</h4>
+    <ul>
+      <li><strong>Structured outputs</strong> — the model returns JSON with the exact field names; parsing failure = a retry, then flag.</li>
+      <li><strong>Fields checked in code, not by asking the model</strong> — "a model might be confident about an empty page; a field is populated or it isn't."</li>
+      <li><strong>Evidence per field</strong> — each extracted fact carries the snippet/source it came from, so the decision log can cite it (defensibility).</li>
+      <li><strong>Grounding</strong> — the model sees only cleaned on-page text; no outside knowledge is treated as fact for qualification.</li>
+      <li><strong>Bounded + handoff</strong> — the iteration cap prevents runaway cost; at the cap the answer is "hand to a human," not "try harder."</li>
+    </ul>
+  </section>
+
+  <!-- 12 -->
+  <section id="db">
+    <h2><span class="ph">Phase 7 · data</span>Database design <span class="tag opt">PROPOSED</span></h2>
+    <p>The brief needs no heavy database, but FR9 (defensibility) and the cost dial "don't re-research" both need persistence. A single local <strong>SQLite</strong> file is the simplest sufficient choice.</p>
+    <figure class="mer"><pre class="mermaid">
+erDiagram
+  RUN ||--o{ COMPANY : processes
+  COMPANY ||--o{ PAGE : scraped
+  COMPANY ||--|| QUALIFICATION : has
+  COMPANY ||--o{ CONTACT : has
+  CONTACT ||--o{ EMAIL : receives
+  COMPANY ||--o{ DECISION : logs
+  RUN {
+    text id PK
+    datetime started_at
+    text input_file
+    int n_qualified
+  }
+  COMPANY {
+    text id PK
+    text domain
+    text name
+    text status
+    bool is_saas
+    bool already_certified
+    text stage
+    int fetch_count
+    datetime researched_at
+  }
+  PAGE {
+    text id PK
+    text company_id FK
+    text url
+    text clean_text
+    text fetch_method
+  }
+  QUALIFICATION {
+    text company_id FK
+    text verdict
+    text reasons
+    text evidence
+  }
+  CONTACT {
+    text id PK
+    text company_id FK
+    text name
+    text role
+    text email
+    text source
+    real confidence
+  }
+  EMAIL {
+    text id PK
+    text contact_id FK
+    text subject
+    text body
+    text hook
+    datetime sent_at
+  }
+  DECISION {
+    text id PK
+    text company_id FK
+    text step
+    text rationale
+    datetime at
+  }
+</pre><figcaption>Six tables. <code>researched_at</code> drives the cache; <code>DECISION</code> + <code>QUALIFICATION.evidence</code> make every choice defensible.</figcaption></figure>
+    <ul>
+      <li><strong>Retention</strong> — keep pages/results to power the cache; a page older than <em>N</em> days is re-fetched.</li>
+      <li><strong>Validation</strong> — <code>status</code> and <code>verdict</code> are enums (qualified / disqualified / flagged / failed).</li>
+      <li><strong>Privacy</strong> — <code>CONTACT</code> holds personal data (name, email): store minimally, don't share, mind GDPR/DPDP (deck slide 16).</li>
+    </ul>
+  </section>
+
+  <!-- 13 -->
+  <section id="repo">
+    <h2><span class="ph">Phase 9 · structure</span>Repository structure <span class="tag opt">PROPOSED</span></h2>
+<div class="tw"><table><tbody>
+<tr><td><pre style="margin:0;font-family:var(--mono);font-size:12px;white-space:pre;line-height:1.5">brendo/
+├─ README.md
+├─ pyproject.toml / requirements.txt
+├─ .env.example            # LLM, HUNTER, GMAIL keys
+├─ config/
+│  └─ icp.yaml             # Evidence Map: fields, sources, thresholds, cap
+├─ data/
+│  └─ brendo.db            # SQLite (gitignored)
+├─ inputs/
+│  └─ domains.csv
+├─ src/brendo/
+│  ├─ cli.py               # entry point
+│  ├─ orchestrator.py      # 7-step runner + batch + isolation
+│  ├─ scraper.py           # robots, single-fetch, headless fallback
+│  ├─ cleaner.py           # strip/dedupe/cap
+│  ├─ extractor.py         # LLM structured extraction
+│  ├─ qualifier.py         # loop control + short-circuits
+│  ├─ poc.py               # Hunter / Apollo
+│  ├─ painpoints.py        # LLM
+│  ├─ emailer.py           # draft (LLM) + Gmail send
+│  ├─ store.py             # SQLite cache + decision log
+│  ├─ llm.py               # model client wrapper
+│  └─ schemas.py           # JSON schemas / dataclasses
+└─ tests/
+   ├─ unit/  integration/  e2e/  fixtures/
+</pre></td></tr></tbody></table></div>
+  </section>
+
+  <!-- 14 -->
+  <section id="roadmap">
+    <h2><span class="ph">Phase 9</span>Development roadmap</h2>
+    <div class="tw"><table>
+      <thead><tr><th>Phase</th><th>Tasks</th><th>Depends on</th><th>Output</th><th>Acceptance</th><th>Pri</th></tr></thead>
+      <tbody>
+        <tr><td>1 · Setup</td><td>Repo, env, keys, SQLite schema, ICP config skeleton</td><td>—</td><td>Runnable skeleton</td><td>CLI runs, DB created, keys load</td><td><span class="tag must">P0</span></td></tr>
+        <tr><td>2 · Acquire</td><td>Scraper (robots, single-fetch, headless fallback) + Cleaner</td><td>1</td><td>clean text per URL</td><td>Clean text ≤2k tokens on 3 sample sites</td><td><span class="tag must">P0</span></td></tr>
+        <tr><td>3 · Extract + ICP</td><td>Encode Evidence Map; structured extractor; field validation in code</td><td>2</td><td>company JSON</td><td>Named fields filled or empty, never guessed</td><td><span class="tag must">P0</span></td></tr>
+        <tr><td>4 · Qualify loop</td><td>Completeness check, named-source fetch, cap, short-circuits, graceful handoff</td><td>3</td><td>verdict + reasons</td><td>Thin-signal site triggers a careers fetch; cap stops it</td><td><span class="tag must">P0</span></td></tr>
+        <tr><td>5 · PoC + email</td><td>Hunter/Apollo; pain points; drafter; Gmail send</td><td>4</td><td>email in inbox</td><td>By-name email with a real hook arrives</td><td><span class="tag must">P0</span></td></tr>
+        <tr><td>6 · Persistence</td><td>Cache, decision log, batch report, error isolation</td><td>2–5</td><td>defensible run</td><td>Re-run skips cached; one failure doesn't halt batch</td><td><span class="tag part">P1</span></td></tr>
+        <tr><td>7 · QA + hardening</td><td>Cost tuning, model choice, edge cases, defensibility review</td><td>all</td><td>reviewed build</td><td>Passes the Assessment Frame on a 5-domain list</td><td><span class="tag part">P1</span></td></tr>
+      </tbody>
+    </table></div>
+    <h4>Sequence, blockers &amp; estimate</h4>
+    <ul>
+      <li><strong>Critical path:</strong> Setup → Acquire → Extract → Loop → PoC/Email. Persistence and QA wrap around it.</li>
+      <li><strong>Likely blockers:</strong> JS-rendered / Cloudflare-protected target sites; Hunter's 25/month cap during testing (mock it); Gmail auth setup.</li>
+      <li><strong>Complexity:</strong> the loop (step 4) and clean extraction (step 3) are the hard 20%; everything else is plumbing.</li>
+      <li><strong>Estimate (rough, not a commitment):</strong> a working end-to-end build is ~1.5–3 focused days; the session itself is scoped at 1.5 hours for a single-company demo path.</li>
+    </ul>
+  </section>
+
+  <!-- 15 -->
+  <section id="testing">
+    <h2><span class="ph">Phase 10</span>Testing &amp; validation</h2>
+    <div class="tw"><table>
+      <thead><tr><th>Layer</th><th>What it checks</th><th>Example case → expected</th></tr></thead>
+      <tbody>
+        <tr><td>Unit</td><td>Cleaner, field validation, short-circuit rules</td><td>Cleaner on a nav-heavy page → ≤2k tokens, no cookie text</td></tr>
+        <tr><td>Unit</td><td>Loop controller</td><td>Missing "stage" field, under cap → requests /careers; at cap → flag</td></tr>
+        <tr><td>API</td><td>External calls (mocked)</td><td>Hunter returns no email → PoC flagged, pipeline continues</td></tr>
+        <tr><td>Integration</td><td>Scrape → clean → extract</td><td>Fixture HTML → expected company JSON</td></tr>
+        <tr><td>E2E</td><td>Full run on a seeded domain</td><td>Qualified domain → email lands in inbox</td></tr>
+        <tr><td>AI output</td><td>Extraction + draft quality</td><td>Golden set: fields match; email names person + has one concrete hook</td></tr>
+        <tr><td>Error handling</td><td>Degrade gracefully</td><td>One site 403s → reason logged, batch continues</td></tr>
+        <tr><td>Security/privacy</td><td>Secrets + PII</td><td>No keys in logs; contact data not sent to third parties</td></tr>
+      </tbody>
+    </table></div>
+    <h4>Most important failure scenarios</h4>
+    <ul>
+      <li><strong>Silent scraper success</strong> — returns nav text, not signal → model qualifies on noise. Guard: assert clean-text length/shape; evidence snippets required.</li>
+      <li><strong>Confident-but-empty extraction</strong> → qualifying a thin page. Guard: field-presence check in code.</li>
+      <li><strong>Runaway loop</strong> → unbounded cost. Guard: hard iteration cap + handoff.</li>
+      <li><strong>Stale/wrong PoC</strong> → emailing the wrong person. Guard: confidence flag; human review before real send.</li>
+      <li><strong>Generic hook</strong> → the failure the build is designed against. Guard: pain points must cite a scraped fact.</li>
+    </ul>
+    <h4>Acceptance measures [DOC — 5 pre-build decisions]</h4>
+    <p class="kv">Time/company &lt; 2 min · Growth Lead rewrites &lt; 20% of emails · PoC accuracy ≥ 60%. <strong>Kill criterion:</strong> shut down if rewrite rate &gt; 50%, or the system takes longer than it saves, or PoC accuracy &lt; 60%.</p>
+  </section>
+
+  <!-- 16 -->
+  <section id="risks">
+    <h2><span class="ph">Phase 11 · item 16</span>Risks &amp; open questions</h2>
+    <div class="tw"><table>
+      <thead><tr><th>Risk</th><th>Impact</th><th>Mitigation</th></tr></thead>
+      <tbody>
+        <tr><td>Target sites JS-rendered / Cloudflare-protected</td><td>Empty or blocked fetches</td><td>Headless fallback; if blocked, log + skip (don't fight bot detection)</td></tr>
+        <tr><td>Hunter free cap (25/mo) hit in testing</td><td>Can't resolve PoC</td><td>Mock in tests; use Apollo-hardcode path for the demo</td></tr>
+        <tr><td>LLM hallucinates fields</td><td>Wrong qualification</td><td>Structured output + code field-check + evidence snippets</td></tr>
+        <tr><td>Legal/ethical (ToS, PII)</td><td>Exposure</td><td>robots.txt + single-fetch + minimal PII storage; prefer API over scraping</td></tr>
+        <tr><td>Cost creep</td><td>Budget</td><td>Clean first, cheap model, cache (the three dials)</td></tr>
+      </tbody>
+    </table></div>
+    <h3>Open questions for you</h3>
+    <ol>
+      <li><strong>"Nine slides"</strong> — did you mean The Nine Checks, or a separate deck deliverable? (I mapped both.)</li>
+      <li><strong>Model &amp; language</strong> — any required LLM or language, or is Python + a capable model acceptable?</li>
+      <li><strong>PoC path</strong> — Hunter.io API (live) or Apollo hardcode for the demo?</li>
+      <li><strong>Scope of "sites"</strong> — a fixed test list, or arbitrary real domains (changes how much anti-blocking matters)?</li>
+      <li><strong>Persistence</strong> — is a SQLite cache + decision log in scope, or keep it in-memory for the session demo?</li>
+    </ol>
+    <div class="note">
+      <span class="lbl">What I did not invent</span>
+      Every functional requirement, the ICP/Evidence Map, the Nine Checks, the 5 pre-build decisions, the cost figures, and the PoC/Gmail choices come straight from the two documents. Language, runtime, orchestration style, SQLite, repo layout, internal function contracts, and estimates are my recommendations, marked [PROPOSED]. No named technology was replaced.
+    </div>
+
+    <p class="foot">Brendo technical blueprint · derived from "Cold Outreach, at Scale" (brief) and "L4: Data Acquisition &amp; Agent Loops" (deck). Prepared for review before build — nothing has been implemented yet.</p>
+  </section>
+</main>
+</div>
