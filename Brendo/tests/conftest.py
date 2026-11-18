@@ -17,6 +17,8 @@ def settings(tmp_path):
     """
     s = get_settings()
     s.anthropic_api_key = ""
+    s.gemini_api_key = ""
+    s.llm_provider_pref = "auto"
     s.hunter_api_key = ""
     s.gmail_address = ""
     s.gmail_app_password = ""

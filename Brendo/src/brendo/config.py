@@ -45,6 +45,10 @@ class Settings:
     anthropic_api_key: str = ""
     llm_model: str = "claude-haiku-5-5"
     llm_model_draft: str = "claude-sonnet-5-5"
+    gemini_api_key: str = ""
+    gemini_model: str = "gemini-3.5-flash-lite"      # extraction + pain points (cheap, free tier)
+    gemini_model_draft: str = "gemini-4-hydrogen"    # drafting
+    llm_provider_pref: str = "auto"                  # auto | anthropic | gemini
     hunter_api_key: str = ""
     apollo_contact: str = ""           # legacy global hardcode --- ignored, see contacts_path
     send_to: str = "you@example.com"
@@ -58,6 +62,9 @@ class Settings:
     prices: dict = field(default_factory=lambda: {
         "claude-haiku-5-5": (0.10, 0.50),
         "claude-sonnet-5-5": (2.00, 10.00),
+        # Gemini paid-tier rates (the free tier costs nothing; estimate assumes paid)
+        "gemini-3.5-flash-lite": (0.30, 2.50),
+        "gemini-4-hydrogen": (1.50, 7.50),
     })
     icp_path: Path = field(default_factory=lambda: ROOT / "config" / "icp.json")
     db_path: Path = field(default_factory=lambda: ROOT / "data" / "brendo.db")
@@ -67,8 +74,29 @@ class Settings:
 
     # --- mock switches: True => use the built-in mock instead of a live service ---
     @property
+    def provider(self) -> str:
+        """Which LLM runs: anthropic | gemini | mock.
+
+        auto picks whichever key is set (Anthropic first). A Google key (starts 'AIza')
+        pasted into ANTHROPIC_API_KEY by mistake is used as the Gemini key.
+        """
+        pref = (self.llm_provider_pref or "auto").lower()
+        has_a, has_g = bool(self.anthropic_api_key), bool(self.gemini_api_key)
+        if pref == "gemini":
+            return "gemini" if has_g else "mock"
+        if pref == "anthropic":
+            return "anthropic" if has_a else "mock"
+        return "anthropic" if has_a else ("gemini" if has_g else "mock")
+
+    @property
     def llm_is_mock(self) -> bool:
-        return not self.anthropic_api_key
+        return self.provider == "mock"
+
+    def active_models(self) -> tuple[str, str]:
+        """(extraction model, drafting model) for the active provider."""
+        if self.provider == "gemini":
+            return self.gemini_model, self.gemini_model_draft
+        return self.llm_model, self.llm_model_draft
 
     @property
     def hunter_is_mock(self) -> bool:
@@ -101,11 +129,22 @@ def get_settings() -> Settings:
         apollo_contact=e("BRENDO_APOLLO_CONTACT", ""),
         send_to=e("BRENDO_SEND_TO", "you@example.com"),
         gmail_address=e("GMAIL_ADDRESS", ""),
-        gmail_app_password=e("GMAIL_APP_PASSWORD", ""),
+        # Google shows App Passwords as "abcd efgh ijkl mnop"; spaces are not part of it
+        gmail_app_password=e("GMAIL_APP_PASSWORD", "").replace(" ", ""),
         cache_ttl_days=int(e("BRENDO_CACHE_TTL_DAYS", "7") or 7),
         max_fetches=int(e("BRENDO_MAX_FETCHES", "4") or 4),
         fetch_delay=float(e("BRENDO_FETCH_DELAY", "1.5") or 1.5),
+        gemini_api_key=e("GEMINI_API_KEY", "") or e("GOOGLE_API_KEY", ""),
+        gemini_model=e("BRENDO_GEMINI_MODEL", "") or "gemini-3.5-flash-lite",
+        gemini_model_draft=e("BRENDO_GEMINI_MODEL_DRAFT", "") or "gemini-4-hydrogen",
+        llm_provider_pref=e("BRENDO_LLM_PROVIDER", "auto") or "auto",
     )
+    s.key_was_misplaced = False
+    if s.anthropic_api_key.startswith("AIza"):
+        # a Google key in the Anthropic slot: use it for Gemini instead
+        s.gemini_api_key = s.gemini_api_key or s.anthropic_api_key
+        s.anthropic_api_key = ""
+        s.key_was_misplaced = True
     if e("BRENDO_CONTACTS_FILE"):
         s.contacts_path = Path(e("BRENDO_CONTACTS_FILE"))
     for k, v in os.environ.items():

@@ -52,11 +52,34 @@ def test_thin_signal_stops_at_limits_and_flags(settings):   # T-QUA-4
 
 
 def test_cap_reason_only_when_a_question_is_left_unanswered(settings):
-    _, qual, _ = _run_one(settings, "thinsignal.example")
-    assert not any("fetch cap" in f for f in qual.flags)    # limits ran out, not the cap
-    settings.max_fetches = 1
-    _, qual, _ = _run_one(settings, "thinsignal.example")
-    assert any("fetch cap" in f for f in qual.flags)
+    _, qual, _ = _run_one(settings, "acme.example")           # every question answered
+    assert not any("fetch cap" in f for f in qual.flags)
+    _, qual, _ = _run_one(settings, "thinsignal.example")     # every extra page 404s
+    assert qual.fetches_used == settings.max_fetches
+    assert any("fetch cap" in f and "right_stage" in f for f in qual.flags)
+
+
+def test_missing_page_does_not_use_up_the_question_limit(settings):
+    _, _, result = _run_one(settings, "thinsignal.example")
+    tried = [d["rationale"] for d in result.decisions if "already_certified" in d["rationale"]]
+    assert any("/security (missing)" in t for t in tried)
+    assert any("/trust (missing)" in t for t in tried)           # second source still tried
+
+
+def test_follows_the_companys_own_trust_link(settings, tmp_path):
+    import shutil
+    samples = tmp_path / "samples"
+    shutil.copytree(settings.samples_dir / "acme.example", samples / "linked.example")
+    (samples / "linked.example" / "index.html").write_text(
+        (samples / "linked.example" / "index.html").read_text().replace(
+            "</main>", '<a href="/blog/soc2-announcement">Security</a></main>'))
+    (samples / "linked.example" / "blog_soc2-announcement.html").write_text(
+        "<main><p>Acme is now SOC 2 Type II certified, audited by an independent firm this year.</p></main>")
+    settings.samples_dir = samples
+    company, qual, result = _run_one(settings, "linked.example")
+    assert qual.verdict == "disqualified" and "SOC 2" in company.certifications
+    assert any("linked from homepage" in d["rationale"] for d in result.decisions)
+    assert qual.fetches_used == 1                              # no guessing /security
 
 
 class _DeadScraper(Scraper):
@@ -121,3 +144,16 @@ def test_one_failure_does_not_stop_the_batch(settings):       # T-ERR-1
     assert by["nosuch.example"].status == "failed"
     assert "homepage missing" in by["nosuch.example"].error
     assert by["acme.example"].status == "drafted"
+
+
+def test_unreadable_trust_centre_is_flagged_and_ranked_lower(settings, tmp_path):
+    import shutil
+    samples = tmp_path / "samples"
+    shutil.copytree(settings.samples_dir / "acme.example", samples / "tc.example")
+    idx = samples / "tc.example" / "index.html"
+    idx.write_text(idx.read_text().replace("</main>", '<a href="/trust">Trust</a></main>'))
+    (samples / "tc.example" / "trust.html").write_text("<div id=root></div><script>app()</script>")
+    settings.samples_dir = samples
+    _, qual, _ = _run_one(settings, "tc.example")
+    assert qual.verdict == "qualified" and qual.rank == "lower"
+    assert any("trust centre" in f and "likely already certified" in f for f in qual.flags)

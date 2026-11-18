@@ -63,3 +63,43 @@ def test_offline_missing_page_is_a_failure(settings):
     s = Scraper(settings.samples_dir, offline=True)
     f = s.fetch("nosuch.example", "/")
     assert f.status == "missing" and f.failed
+
+
+def test_robots_403_for_python_agent_is_not_treated_as_block(monkeypatch):
+    """robots.txt is fetched with Brendo's UA; 4xx = no rules (RFC 9309), 5xx = deny all."""
+    import httpx
+    s = Scraper(None, offline=False)
+
+    class R:
+        def __init__(self, code, text=""):
+            self.status_code, self.text = code, text
+
+    monkeypatch.setattr(httpx, "get", lambda url, **kw: R(404))
+    assert s.robots_allowed("a.example", "/")
+    monkeypatch.setattr(httpx, "get", lambda url, **kw: R(503))
+    assert not s.robots_allowed("b.example", "/")
+    seen = {}
+    monkeypatch.setattr(httpx, "get", lambda url, **kw: seen.update(kw) or R(200, "User-agent: *\nDisallow: /private"))
+    assert s.robots_allowed("c.example", "/") and not s.robots_allowed("c.example", "/private/x")
+    assert "BrendoResearchBot" in seen["headers"]["User-Agent"]
+
+
+def test_404_is_missing_not_error(monkeypatch):
+    s = _scraper_with_robots("User-agent: *\nAllow: /")
+
+    class Resp:
+        status_code = 404
+
+    class E(Exception):
+        response = Resp()
+
+    monkeypatch.setattr(s, "_request", lambda url: (_ for _ in ()).throw(E("404")))
+    assert s.fetch("acme.example", "/security").status == "missing"
+
+
+def test_links_are_extracted_absolute():
+    from brendo.scraper import extract_links
+    links = extract_links('<a href="/trust">Trust center</a> <a href="https://x.io/soc2">SOC 2</a>',
+                          "https://acme.example/")
+    assert ("https://acme.example/trust", "Trust center") in links
+    assert ("https://x.io/soc2", "SOC 2") in links

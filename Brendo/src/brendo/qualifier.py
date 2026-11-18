@@ -55,6 +55,8 @@ def stage_band(acc: CompanyFields, icp: dict) -> str:
         return "target"
     if any(e in stage for e in r.get("early_stages", [])):
         return "early"
+    if any(o in stage for o in r.get("other_stages", [])):
+        return "other"
     if stage.startswith("series"):
         return "late"
     return "unknown"
@@ -68,20 +70,21 @@ def _rank(acc: CompanyFields, icp: dict, base: str) -> tuple[str, list[str], lis
         notes.append(f"compliance pressure: {acc.compliance_signals[0]!r}")
     if band == "target":
         notes.append(f"{acc.funding_stage} is in Sprinto's Series A-C sweet spot")
-    elif band in ("early", "late"):
+    elif band in ("early", "late", "other"):
         notes.append(f"{acc.funding_stage} is outside the typical Series A-C range")
         flags.append(f"Stage {acc.funding_stage} is outside Series A-C --- check fit")
 
     if base == "lower":
         return "lower", notes, flags
-    if band in ("early", "late"):
+    if band in ("early", "late", "other"):
         return "lower", notes, flags
     if acc.compliance_signals and band in ("target", "unknown"):
         return "high", notes, flags
     return "normal", notes, flags
 
 
-def _decide(acc: CompanyFields, icp: dict, cert_checked: bool) -> tuple[str, list[str], str, list[str]]:
+def _decide(acc: CompanyFields, icp: dict, cert_sources: list[str],
+            unreadable_trust: str | None = None) -> tuple[str, list[str], str, list[str]]:
     # 1. already certified -> disqualify + STOP
     if acc.certifications:
         return ("disqualified", [f"Already certified ({', '.join(acc.certifications)}) --- no need for Sprinto"],
@@ -94,8 +97,11 @@ def _decide(acc: CompanyFields, icp: dict, cert_checked: bool) -> tuple[str, lis
         return "flagged", ["SaaS status could not be determined --- manual_review"], "normal", []
 
     flags = []
-    if not acc.certifications:
-        where = "homepage + /security" if cert_checked else "homepage only"
+    if unreadable_trust:
+        flags.append(f"Publishes a trust centre ({unreadable_trust}) that needs a browser to read --- "
+                     "likely already certified; check it before any outreach")
+    elif not acc.certifications:
+        where = " + ".join(["homepage"] + cert_sources)
         flags.append(f"No named certification found ({where}) --- treated as not certified")
 
     # 4. stage
@@ -107,7 +113,7 @@ def _decide(acc: CompanyFields, icp: dict, cert_checked: bool) -> tuple[str, lis
             signals.append(f"{acc.open_roles_count} open roles")
         if acc.enterprise_customers:
             signals.append("enterprise customers")
-        rank, notes, rflags = _rank(acc, icp, "normal")
+        rank, notes, rflags = _rank(acc, icp, "lower" if unreadable_trust else "normal")
         reasons = ["B2B SaaS, not yet certified; " + ", ".join(signals)] + notes
         return "qualified", reasons, rank, flags + rflags
     rank, notes, rflags = _rank(acc, icp, "lower")
@@ -116,9 +122,13 @@ def _decide(acc: CompanyFields, icp: dict, cert_checked: bool) -> tuple[str, lis
             rank, flags + rflags)
 
 
+_JOBS = ("career", "jobs", "job-", "/job", "hiring", "join", "work-with-us", "ashbyhq", "greenhouse", "lever.co",
+         "workable", "recruitee")
+
+
 def _absorb(acc: CompanyFields, page_clean: str, llm: LLM, result: CompanyResult, where: str) -> None:
     new = extractor.extract(page_clean, llm)
-    dropped = extractor.verify(new, page_clean)
+    dropped = extractor.verify(new, page_clean, jobs_page=any(j in where.lower() for j in _JOBS))
     for d in dropped:
         result.log("verify", f"dropped from {where}: {d}")
     extractor.merge(acc, new)
@@ -138,34 +148,56 @@ def qualify(domain: str, scraper: Scraper, llm: LLM, icp: dict, max_fetches: int
         result.log("extract", f"from homepage: {_filled(acc)}")
 
     # adaptive loop --- fill missing answers from named sources, under the global cap.
+    # Sources per question: links the company itself publishes (matching the question's
+    # link_keywords), then the Evidence Map's fixed paths. A missing page (404) does not
+    # use up the question's limit; every request counts toward the global cap.
     # If a disqualifying short-circuit is already decided, stop (Evidence Map: "stop").
     fetches = 0
-    cert_checked = False
+    cert_sources: list[str] = []
+    unreadable_trust: str | None = None
     unanswered_at_cap: str | None = None
+    tried: set[str] = {hp.url.rstrip("/")}
     for question in icp["questions"]:
         if _early_decided(acc):
             result.log("loop", "short-circuit already decided --- stop fetching")
             break
         if _answered(question, acc, icp):
             continue
-        for src in question["sources"][: question["limit"]]:
+        sources = _published_links(hp.links, question.get("link_keywords", []),
+                                   icp.get("link_denylist", [])) + question["sources"]
+        used = 0
+        for src in sources:
+            if used >= question["limit"]:
+                break
+            key = (src if src.startswith("http") else f"https://{domain}{src}").rstrip("/")
+            if key in tried:
+                continue
             if fetches >= max_fetches:
                 unanswered_at_cap = question["id"]
                 break
+            tried.add(key)
             f = scraper.fetch(domain, src)
             fetches += 1
+            label = src if not src.startswith("http") else f"{src} (linked from homepage)"
+            result.log("loop", f"need '{question['id']}' -> fetched {label} ({f.status})")
+            if f.status == "missing":
+                continue                        # nothing there: try the next source
+            used += 1
             if question["id"] == "already_certified":
-                cert_checked = True
-            result.log("loop", f"need '{question['id']}' -> fetched {src} ({f.status})")
+                cert_sources.append(src if not src.startswith("http") else src.split("://", 1)[1].rstrip("/"))
+                if src.startswith("http") and "trust" in src.lower() and len(f.clean) < 200:
+                    unreadable_trust = src.split("://", 1)[1].rstrip("/")
             if f.clean:
-                _absorb(acc, f.clean, llm, result, src)
+                _absorb(acc, f.clean, llm, result, label)
             if _answered(question, acc, icp):
-                result.log("loop", f"'{question['id']}' answered after {src}")
+                result.log("loop", f"'{question['id']}' answered after {label}")
                 break
         if unanswered_at_cap:
             break
 
-    verdict, reasons, rank, flags = _decide(acc, icp, cert_checked)
+    if acc.certifications:
+        unreadable_trust = None
+    verdict, reasons, rank, flags = _decide(acc, icp, cert_sources, unreadable_trust)
     if unanswered_at_cap:
         flags.append(f"Hit fetch cap ({max_fetches} beyond homepage) with "
                      f"'{unanswered_at_cap}' unanswered --- graceful handoff")
@@ -176,6 +208,24 @@ def qualify(domain: str, scraper: Scraper, llm: LLM, icp: dict, max_fetches: int
     for fl in flags:
         result.log("flag", fl)
     return acc, q
+
+
+def _published_links(links: list[tuple[str, str]], keywords: list[str], deny: list[str],
+                     limit: int = 2) -> list[str]:
+    """Links on the homepage whose URL or text names what this question needs."""
+    if not keywords:
+        return []
+    out = []
+    for href, text in links:
+        low_href, low_text = href.lower(), (text or "").lower()
+        if any(d in low_href for d in deny):
+            continue
+        path = low_href.split("://", 1)[-1]
+        if any(k in path or k in low_text for k in keywords) and href not in out:
+            out.append(href)
+        if len(out) >= limit:
+            break
+    return out
 
 
 def _filled(acc: CompanyFields) -> str:

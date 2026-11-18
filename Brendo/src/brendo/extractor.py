@@ -28,12 +28,27 @@ def _on_page(snippet: str, page_norm: str) -> bool:
     return bool(sn) and sn in page_norm
 
 
+def _is_link_text(s: str) -> bool:
+    """Short question-style CTA text ('Security questions or concerns?') is navigation,
+    not a statement about the company."""
+    t = (s or "").strip()
+    return t.endswith("?") and len(t.split()) <= 6
+
+
 def extract(text: str, llm: LLM) -> CompanyFields:
     return llm.extract_fields(text)
 
 
-def verify(fields: CompanyFields, page_text: str) -> list[str]:
-    """Drop every field the page does not support. Returns human-readable drop notes."""
+_FIRST_PERSON = re.compile(r"\b(we|we're|we've|our|us)\b", re.IGNORECASE)
+
+
+def verify(fields: CompanyFields, page_text: str, jobs_page: bool = False) -> list[str]:
+    """Drop every field the page does not support. Returns human-readable drop notes.
+
+    Compliance signals need more than presence on the page: off a jobs page (where a role
+    title is the signal) they must be first-person statements by the company ("we", "our").
+    Text inside product screenshots, demo data or testimonials is about someone else.
+    """
     page = _norm(page_text)
     dropped: list[str] = []
 
@@ -55,10 +70,19 @@ def verify(fields: CompanyFields, page_text: str) -> list[str]:
     if not certs:
         fields.evidence.pop("certifications", None)
 
-    sigs = [s for s in fields.compliance_signals if _on_page(s, page)]
+    def _why_not(sig: str) -> str | None:
+        if not _on_page(sig, page):
+            return "not on page"
+        if _is_link_text(sig):
+            return "navigation/link text"
+        if not jobs_page and not _FIRST_PERSON.search(sig):
+            return "not a statement by the company (no 'we/our'); may be demo data or a quote"
+        return None
+
+    sigs = [s for s in fields.compliance_signals if _why_not(s) is None]
     for s in fields.compliance_signals:
         if s not in sigs:
-            dropped.append(f"compliance signal {s!r} (not on page)")
+            dropped.append(f"compliance signal {s!r} ({_why_not(s)})")
     fields.compliance_signals = sigs
     if sigs:
         fields.evidence["compliance_signals"] = sigs[0]
