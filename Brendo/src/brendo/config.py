@@ -129,7 +129,8 @@ def get_settings() -> Settings:
         apollo_contact=e("BRENDO_APOLLO_CONTACT", ""),
         send_to=e("BRENDO_SEND_TO", "you@example.com"),
         gmail_address=e("GMAIL_ADDRESS", ""),
-        gmail_app_password=e("GMAIL_APP_PASSWORD", ""),
+        # Google shows App Passwords as "abcd efgh ijkl mnop"; spaces are not part of it
+        gmail_app_password=e("GMAIL_APP_PASSWORD", "").replace(" ", ""),
         cache_ttl_days=int(e("BRENDO_CACHE_TTL_DAYS", "7") or 7),
         max_fetches=int(e("BRENDO_MAX_FETCHES", "4") or 4),
         fetch_delay=float(e("BRENDO_FETCH_DELAY", "1.5") or 1.5),

@@ -22,3 +22,10 @@ def test_env_example_loads_cleanly(tmp_path, monkeypatch):
     assert os.environ["BRENDO_SEND_TO"] == "you@example.com"
     assert float(os.environ["BRENDO_FETCH_DELAY"]) == 1.5
     assert os.environ["BRENDO_LLM_MODEL"] == "claude-haiku-5-5"
+
+
+def test_app_password_spaces_are_ignored(monkeypatch):
+    from brendo import config
+    monkeypatch.setattr(config, "load_dotenv", lambda *a, **k: None)
+    monkeypatch.setenv("GMAIL_APP_PASSWORD", "abcd efgh ijkl mnop")
+    assert config.get_settings().gmail_app_password == "abcdefghijklmnop"
