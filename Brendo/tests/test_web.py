@@ -131,3 +131,20 @@ def test_local_site_serves_page_and_api_without_password(settings, monkeypatch):
     finally:
         holder["srv"].shutdown()
         holder["srv"].server_close()
+
+
+def test_vercel_can_detect_every_api_function():
+    """Vercel detects Python functions by a visible top-level `class handler(` (see api/*.py)."""
+    import importlib.util
+    import re
+    from http.server import BaseHTTPRequestHandler
+    from pathlib import Path
+    api = Path(__file__).resolve().parents[1] / "api"
+    files = sorted(api.glob("*.py"))
+    assert files
+    for f in files:
+        assert re.search(r"^class handler\(", f.read_text(encoding="utf-8"), re.M), f.name
+        spec = importlib.util.spec_from_file_location(f.stem, f)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        assert issubclass(mod.handler, BaseHTTPRequestHandler) and hasattr(mod.handler, "do_POST")
