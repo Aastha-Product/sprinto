@@ -69,8 +69,11 @@ def _check(settings) -> int:
     if not settings.llm_is_mock:
         try:
             from .llm import get_llm
-            get_llm(settings).ping()
+            llm = get_llm(settings)
+            llm.ping()
             print("  LLM ping      ok (key + models answer)")
+            if getattr(llm, "ping_note", None):
+                print(f"  NOTE          {llm.ping_note}")
         except Exception as exc:
             print(f"  LLM ping      FAILED: {str(exc)[:120]}")
     print("-" * 44)

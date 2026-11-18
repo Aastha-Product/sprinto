@@ -227,6 +227,7 @@ class GeminiLLM:
         self._schema_field = True
         self._sleep = __import__("time").sleep
         self.draft_fallback: str | None = None
+        self.ping_note: str | None = None
 
     def _post(self, model: str, body: dict) -> dict:
         """One generateContent call with backoff on 429/5xx (free-tier rate limits)."""
@@ -328,6 +329,10 @@ class GeminiLLM:
         try:
             self._post(self.model_draft, body)
         except GeminiError as exc:
+            if exc.status == 429:
+                self.ping_note = (f"{self.model_draft} quota used up for now --- drafts will use "
+                                  f"{self.model} until it resets")
+                return True
             if exc.status != 404:
                 raise
             raise RuntimeError(f"drafting model '{self.model_draft}' not found for this key; "

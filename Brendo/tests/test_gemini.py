@@ -177,3 +177,8 @@ def test_draft_quota_used_up_falls_back_to_extraction_model(gem):
     assert gem.write_email({}, {"name": "Jane"}, [])["subject"] == "s"
     assert "flash-lite" in gem.calls[-1]["url"] and gem.draft_fallback
     assert gem.model_draft == gem.model                       # stays switched for the run
+
+
+def test_ping_treats_draft_quota_as_a_note(gem):
+    gem.replies += [ok({})] + [err(429, "You exceeded your current quota")] * 4
+    assert gem.ping() is True and "quota" in gem.ping_note
