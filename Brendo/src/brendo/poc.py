@@ -15,7 +15,7 @@ from __future__ import annotations
 import csv
 from pathlib import Path
 
-from .config import Settings
+from .config import Settings, redact
 from .schemas import Contact, CompanyResult
 
 
@@ -89,13 +89,16 @@ def find_poc(domain: str, settings: Settings, result: CompanyResult,
             import httpx
             r = httpx.get(
                 "https://api.hunter.io/v2/domain-search",
-                params={"domain": domain, "api_key": settings.hunter_api_key, "limit": 10},
+                params={"domain": domain, "limit": 10},
+                # the key goes in a header, never the URL: httpx puts the URL in its
+                # error messages, and those end up in the decision log and the website
+                headers={"X-API-KEY": settings.hunter_api_key},
                 timeout=15,
             )
             r.raise_for_status()
             emails = r.json().get("data", {}).get("emails", []) or []
         except Exception as exc:
-            msg = f"Hunter error: {str(exc)[:80]} --- flagged"
+            msg = f"Hunter error: {redact(str(exc), settings)[:120]} --- flagged"
             result.log("poc", msg)
             return Contact(source="hunter", confidence=0.0, reason=msg)
         e, p, reason = pick(emails, personas)

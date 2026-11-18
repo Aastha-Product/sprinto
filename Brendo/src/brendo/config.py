@@ -118,6 +118,21 @@ class Settings:
         return json.loads(self.icp_path.read_text(encoding="utf-8"))
 
 
+_SECRET_ENV = ("ANTHROPIC_API_KEY", "GEMINI_API_KEY", "GOOGLE_API_KEY", "HUNTER_API_KEY",
+               "GMAIL_APP_PASSWORD", "BRENDO_WEB_PASSWORD")
+
+
+def redact(text: str, settings: "Settings | None" = None) -> str:
+    """Replace any key or password value that appears in `text` with [hidden]."""
+    secrets = {os.environ.get(k, "") for k in _SECRET_ENV}
+    if settings is not None:
+        secrets |= {settings.anthropic_api_key, settings.gemini_api_key,
+                    settings.hunter_api_key, settings.gmail_app_password}
+    for s in sorted((x for x in secrets if x and len(x) >= 6), key=len, reverse=True):
+        text = text.replace(s, "[hidden]")
+    return text
+
+
 def get_settings() -> Settings:
     load_dotenv()
     e = os.environ.get

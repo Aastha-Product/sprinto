@@ -68,3 +68,26 @@ def test_hunter_empty_or_error_is_flagged(monkeypatch, settings):     # T-POC-3
     _hunter(monkeypatch, settings, exc=RuntimeError("429 Too Many Requests"))
     c = poc.find_poc("acme.example", settings, CompanyResult("acme.example"), _personas(settings))
     assert c.email is None and "Hunter error" in c.reason
+
+
+def test_hunter_key_goes_in_a_header_and_never_into_logs(settings, monkeypatch):
+    """httpx puts the request URL in its error text, which reaches the decision log and the
+    website; the key must be in a header and any echo of it must be hidden."""
+    import httpx
+    from brendo import poc
+    from brendo.schemas import CompanyResult
+
+    settings.hunter_api_key = "hunterSECRET123"
+    seen = {}
+
+    def boom(url, params=None, headers=None, timeout=None):
+        seen.update(params=params, headers=headers)
+        raise httpx.ConnectError("failed for key hunterSECRET123")
+
+    monkeypatch.setattr(httpx, "get", boom)
+    result = CompanyResult(domain="acme.com")
+    c = poc.find_poc("acme.com", settings, result, [])
+    assert "api_key" not in seen["params"]
+    assert seen["headers"]["X-API-KEY"] == "hunterSECRET123"
+    text = c.reason + " ".join(d["rationale"] for d in result.decisions)
+    assert "hunterSECRET123" not in text and "[hidden]" in text
