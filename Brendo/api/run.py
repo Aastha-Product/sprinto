@@ -4,6 +4,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from brendo.web import make_handler  # noqa: E402
+from brendo.web import ApiHandler  # noqa: E402
 
-handler = make_handler("run")
+
+class handler(ApiHandler):  # noqa: N801 --- Vercel looks for this exact name
+    action = "run"

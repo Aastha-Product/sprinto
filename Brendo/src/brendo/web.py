@@ -177,20 +177,27 @@ def handle_post(req: BaseHTTPRequestHandler, action: str, local: bool = False) -
         _respond(req, 500, {"error": f"Server error: {str(exc)[:200]}"})
 
 
+class ApiHandler(BaseHTTPRequestHandler):
+    """Base for the api/*.py files. Each one declares `class handler(ApiHandler)` with its
+    `action`: Vercel finds a Python function by reading the file for a class named
+    `handler`, so the class must be written out in the file, not built by a call."""
+
+    action = ""
+    local = False
+
+    def do_POST(self) -> None:  # noqa: N802
+        handle_post(self, self.action, self.local)
+
+    def do_GET(self) -> None:  # noqa: N802
+        _respond(self, 405, {"error": "Use POST."})
+
+    def log_message(self, *args) -> None:  # keep request lines out of logs
+        pass
+
+
 def make_handler(action: str, local: bool = False):
-    """A BaseHTTPRequestHandler class for Vercel's Python runtime (it looks for `handler`)."""
-
-    class Handler(BaseHTTPRequestHandler):
-        def do_POST(self) -> None:  # noqa: N802
-            handle_post(self, action, local)
-
-        def do_GET(self) -> None:  # noqa: N802
-            _respond(self, 405, {"error": "Use POST."})
-
-        def log_message(self, *args) -> None:  # keep request lines out of logs
-            pass
-
-    return Handler
+    """An ApiHandler subclass for one action (used by tests and the local server)."""
+    return type("Handler", (ApiHandler,), {"action": action, "local": local})
 
 
 # --- local website: `python -m brendo.web` -----------------------------------------
