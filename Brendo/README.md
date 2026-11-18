@@ -47,6 +47,35 @@ In mock mode, emails are written to `data/outbox/` and the status is `drafted`. 
 | `brendo --review out/campaign-<run>.csv` | Import the review columns; prints rewrite rate and PoC accuracy |
 | `brendo --purge acme.com` | Delete everything stored about a domain (personal data) |
 | `brendo --check` | Shows which services are live and which are mocked |
+| `brendo --web` | The website on this PC at http://localhost:8000 (see below) |
+
+## The website (local, or on Vercel)
+
+The whole workflow also runs from a web page: unlock → setup check → paste domains → **Run** → read each company's verdict, contact, pains, email and send result as it finishes → mark the review → download the campaign record (CSV / Markdown). It calls the same tested pipeline as the CLI, one company per request, so the page shows progress company by company. `/blueprint.html` serves the technical blueprint.
+
+**On your PC** (uses `Brendo/.env`; reachable only from this computer):
+
+```bash
+brendo --web            # or: PYTHONPATH=src python -m brendo.web   ·   Windows: .\run.ps1 --web
+```
+
+Then open http://localhost:8000.
+
+**On Vercel** (a public link, protected by a site password):
+
+1. vercel.com → **Add New… → Project** → import the GitHub repo `Aastha-Product/sprinto`.
+2. **Root Directory:** `Brendo`. **Framework Preset:** Other. Leave the build settings as they are (`vercel.json` sets them).
+3. **Environment Variables** (Settings → Environment Variables): the same names as `.env`, typed into Vercel, never committed:
+   `GEMINI_API_KEY` (or `ANTHROPIC_API_KEY`), `HUNTER_API_KEY`, `GMAIL_ADDRESS`, `GMAIL_APP_PASSWORD`, `BRENDO_SEND_TO`, and **`BRENDO_WEB_PASSWORD`**, a password you choose for the site. Without `BRENDO_WEB_PASSWORD` the site refuses to run, so a stranger with the link can't spend your quotas.
+4. **Deploy.** Open the `….vercel.app` link, enter the site password, and click **Test the AI key**.
+
+Things that differ on Vercel:
+
+- Each company gets up to 300 seconds (`maxDuration` in `vercel.json`); a company normally takes about a minute.
+- The cache lives in the server's temporary storage, so it may be gone on the next visit. A company may simply be researched again, which uses another Hunter search.
+- The headless-browser fallback is off. A site that only renders with JavaScript ends as thin or flagged.
+- Results stay in your browser (refresh-safe) until the next run. Download the CSV to keep them.
+- Sending is unchanged: only to `BRENDO_SEND_TO`.
 
 ## The review loop (measuring it)
 
@@ -88,13 +117,15 @@ Fill in `.env` (the template is `.env.example`), then run `brendo --check`. Each
 pytest -q
 ```
 
-There are 68 offline tests, with no keys and no network. They cover the cleaner, the scraper (robots, blocks, browser fallback, polite delay), evidence verification, both LLM clients against fake servers, every ICP path and ranking, persona choice, draft checks and redraft, the send guard, the cache and decision log, the DB upgrade, export and review, and the CLI. CI runs them on every push (`.github/workflows/tests.yml`).
+There are 89 offline tests, with no keys and no network. They cover the cleaner, the scraper (robots, blocks, browser fallback, polite delay), evidence verification, both LLM clients against fake servers, every ICP path and ranking, persona choice, draft checks and redraft, the send guard, the cache and decision log, the DB upgrade, export and review, the CLI, and the website's API (password, domain checks, run, export) over real HTTP. CI runs them on every push (`.github/workflows/tests.yml`).
 
 ## Layout
 
 ```
 src/brendo/   cli · orchestrator · scraper · cleaner · extractor · qualifier
-              poc · painpoints · emailer · exporter · store · llm · config · schemas
+              poc · painpoints · emailer · exporter · store · llm · config · schemas · web
+public/       the website (index.html)                  api/       Vercel functions: check · run · export
+vercel.json   Vercel settings (root directory: Brendo)
 config/icp.json   Evidence Map + ranking + personas     samples/   offline demo sites
 inputs/           domains.csv, contacts.csv             tests/     offline tests
 data/             SQLite + mock outbox (gitignored)     out/       campaign records (gitignored)

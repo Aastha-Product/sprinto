@@ -109,6 +109,7 @@ hr.soft{border:0;border-top:1px dashed var(--border);margin:22px 0}
 <nav class="toc">
   <div class="brand">Brendo — Technical Blueprint</div>
   <div class="sub">Sprinto · AI Case 2 (B2)</div>
+  <a href="#status"><span class="n">00</span>Build status</a>
   <a href="#understanding"><span class="n">01</span>Project understanding</a>
   <a href="#problem"><span class="n">02</span>Problem statement</a>
   <a href="#build"><span class="n">03</span>What we build</a>
@@ -129,14 +130,15 @@ hr.soft{border:0;border-top:1px dashed var(--border);margin:22px 0}
 
 <main>
   <div class="hero">
-    <p class="eyebrow">Technical blueprint · for review before build</p>
+    <p class="eyebrow">Technical blueprint · built, tested, runs from the website</p>
     <h1>Brendo: an automated, defensible cold-outreach pipeline for Sprinto</h1>
     <p class="lead">A repeatable system that takes a list of company domains and, end-to-end, finds the right-fit companies, finds the right person, and drafts &amp; sends a personalised cold email — with every decision recorded so it can be defended.</p>
     <div class="meta">
       <span class="chip ac">Source of truth: 2 documents</span>
       <span class="chip">Brief: "Cold Outreach, at Scale"</span>
       <span class="chip">Deck: "L4 — Data Acquisition &amp; Agent Loops" (42 slides)</span>
-      <span class="chip">As of 14 Nov 2026</span>
+      <span class="chip">Plan of 14 Nov 2026</span>
+      <span class="chip ac">Status updated 18 Nov 2026</span>
     </div>
   </div>
 
@@ -144,6 +146,50 @@ hr.soft{border:0;border-top:1px dashed var(--border);margin:22px 0}
     <span class="lbl">How to read this document</span>
     Everything marked <strong>[DOC]</strong> is taken directly from the two source documents. Everything marked <strong>[PROPOSED]</strong> is my engineering recommendation filling a gap the documents leave open — these are the parts to review and approve. I have not changed any technology the documents name; where I suggest an alternative, it is called out separately, never substituted silently.
   </div>
+
+
+  <!-- 00 -->
+  <section id="status">
+    <h2><span class="ph">Status · 18 Nov 2026</span>Build status — what's built</h2>
+    <p class="lead">Every phase of the roadmap (section 14) is built and covered by an offline test suite (89 tests, no keys, no network, run in CI on every push). The whole workflow now also runs from a website: on your own PC at <code>localhost</code>, or deployed on Vercel behind a site password. <strong>What remains is not code:</strong> the live 5-domain acceptance run and the Growth Lead's review of its output.</p>
+
+    <div class="tw"><table>
+      <thead><tr><th>Roadmap phase</th><th>Status</th><th>Where it lives</th><th>How it was checked</th></tr></thead>
+      <tbody>
+        <tr><td>1 · Setup</td><td><span class="tag ok">BUILT</span></td><td><code>cli.py</code>, <code>config.py</code>, <code>store.py</code>, <code>config/icp.json</code></td><td>CLI runs, DB created and upgraded in place, keys load from <code>.env</code> or the host's environment</td></tr>
+        <tr><td>2 · Acquire</td><td><span class="tag ok">BUILT</span></td><td><code>scraper.py</code>, <code>cleaner.py</code></td><td>robots.txt per RFC 9309, polite delay, single fetch, optional headless fallback; tests on nav-heavy, blocked and JS-shell pages</td></tr>
+        <tr><td>3 · Extract + ICP</td><td><span class="tag ok">BUILT</span></td><td><code>extractor.py</code>, <code>llm.py</code></td><td>A fact is kept only if its quoted evidence is on the page; empty stays empty</td></tr>
+        <tr><td>4 · Qualify loop</td><td><span class="tag ok">BUILT</span></td><td><code>qualifier.py</code></td><td>Thin site triggers a named-page fetch; cap stops it with a human handoff; already-certified short-circuits; ranking by stage and compliance pressure</td></tr>
+        <tr><td>5 · PoC + email</td><td><span class="tag ok">BUILT</span></td><td><code>poc.py</code>, <code>painpoints.py</code>, <code>emailer.py</code></td><td>Hunter or <code>contacts.csv</code> (Apollo by hand) with ranked personas; two grounded pains; draft checked in code and redrafted once; Gmail send to self only, with a review note</td></tr>
+        <tr><td>6 · Persistence</td><td><span class="tag ok">BUILT</span></td><td><code>store.py</code>, <code>orchestrator.py</code></td><td>Re-run skips cached results; failures never cached; one failure never stops the batch; <code>--why</code> decision log per run</td></tr>
+        <tr><td>7 · QA + hardening</td><td><span class="tag part">CODE DONE · LIVE RUN PENDING</span></td><td><code>exporter.py</code>, the website's review panel</td><td>First live runs on 8 real SaaS domains fixed what they found; the 5-domain acceptance run (Assessment Frame) is next</td></tr>
+        <tr><td>+ Website</td><td><span class="tag ok">BUILT</span></td><td><code>public/index.html</code>, <code>api/</code>, <code>web.py</code>, <code>vercel.json</code></td><td>Browser test: unlock → check → run → report → review → CSV/Markdown download; API tests over real HTTP</td></tr>
+      </tbody>
+    </table></div>
+
+    <h3>Run the complete workflow from the website</h3>
+    <ol>
+      <li><strong>Unlock</strong> with the site password (<code>BRENDO_WEB_PASSWORD</code>).</li>
+      <li><strong>Setup check</strong> shows which services are live (LLM, Hunter, Gmail) and the only recipient; <em>Test the AI key</em> pings the model.</li>
+      <li><strong>Run</strong>: paste domains. Each company goes through all 7 steps on the server and its card appears as it finishes: verdict and why, contact and why, two pains, the email, the send result and the full decision log.</li>
+      <li><strong>Review</strong>: mark each draft approved / edited / rejected and whether the contact was right; the page shows the rewrite rate and PoC accuracy against the kill criteria.</li>
+      <li><strong>Export</strong> the campaign record as CSV or Markdown, with your review marks filled in.</li>
+    </ol>
+    <div class="cols">
+      <div class="card"><h4>On your PC</h4><p><code>brendo --web</code> (Windows: <code>.\run.ps1 --web</code>), then open <code>http://localhost:8000</code>. Uses <code>Brendo/.env</code>; only this computer can reach it.</p></div>
+      <div class="card"><h4>On Vercel</h4><p>Import the repo, Root Directory <code>Brendo</code>, add the keys and <code>BRENDO_WEB_PASSWORD</code> as Environment Variables, deploy. Steps in the README. Keys never go in the repo.</p></div>
+    </div>
+
+    <h3>Where the build differs from this plan</h3>
+    <ul>
+      <li><strong>Two LLM providers</strong>: Gemini (free tier) as well as Claude; the rest of the pipeline doesn't know which ran.</li>
+      <li><strong>ICP config is JSON</strong> (<code>config/icp.json</code>), not YAML, so no extra dependency; it also holds ranking signals and buyer personas.</li>
+      <li><strong>Apollo path</strong> is a per-domain <code>inputs/contacts.csv</code>, not one hardcoded contact.</li>
+      <li><strong>Interface</strong>: the CLI plus a website (the plan said CLI only). The website's internal routes are real now: <code>POST /api/check</code>, <code>/api/run</code> (one company), <code>/api/export</code>.</li>
+      <li><strong>On Vercel</strong> the cache is temporary and the headless-browser fallback is off.</li>
+    </ul>
+    <p class="kv">Open questions in section 16 were settled by building: Python + Gemini or Claude; Hunter live with the Apollo file as fallback; arbitrary real domains (robots-respecting, no bot-wall fighting); SQLite cache + decision log in scope.</p>
+  </section>
 
   <!-- 01 -->
   <section id="understanding">
@@ -770,7 +816,15 @@ erDiagram
       Every functional requirement, the ICP/Evidence Map, the Nine Checks, the 5 pre-build decisions, the cost figures, and the PoC/Gmail choices come straight from the two documents. Language, runtime, orchestration style, SQLite, repo layout, internal function contracts, and estimates are my recommendations, marked [PROPOSED]. No named technology was replaced.
     </div>
 
-    <p class="foot">Brendo technical blueprint · derived from "Cold Outreach, at Scale" (brief) and "L4: Data Acquisition &amp; Agent Loops" (deck). Prepared for review before build — nothing has been implemented yet.</p>
+    <p class="foot">Brendo technical blueprint · derived from "Cold Outreach, at Scale" (brief) and "L4: Data Acquisition &amp; Agent Loops" (deck). Written for review before the build; section 00 records what was built (status as of 18 Nov 2026).</p>
   </section>
 </main>
 </div>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
+<script>
+(function(){
+  var t=document.documentElement.getAttribute('data-theme');
+  var dark=t?t==='dark':(window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches);
+  try{mermaid.initialize({startOnLoad:true,theme:dark?'dark':'neutral',securityLevel:'strict',flowchart:{htmlLabels:true}});}catch(e){}
+})();
+</script>

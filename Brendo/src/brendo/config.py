@@ -145,6 +145,12 @@ def get_settings() -> Settings:
         s.gemini_api_key = s.gemini_api_key or s.anthropic_api_key
         s.anthropic_api_key = ""
         s.key_was_misplaced = True
+    # Where the cache DB, mock outbox and exports go. Serverless hosts (Vercel) can only
+    # write under /tmp, so it defaults there when running on Vercel.
+    data_dir = e("BRENDO_DATA_DIR", "") or ("/tmp/brendo" if e("VERCEL") else "")
+    if data_dir:
+        s.db_path = Path(data_dir) / "brendo.db"
+        s.out_dir = Path(data_dir) / "out"
     if e("BRENDO_CONTACTS_FILE"):
         s.contacts_path = Path(e("BRENDO_CONTACTS_FILE"))
     for k, v in os.environ.items():
