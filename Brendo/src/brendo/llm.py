@@ -97,9 +97,13 @@ _EXTRACT_SYS = (
     "list) when the text does not say; never infer beyond it. "
     "certifications = compliance standards the company itself HOLDS (e.g. 'SOC 2', "
     "'ISO 27001', 'GDPR'), not ones it merely mentions or is working towards. "
-    "compliance_signals = short verbatim phrases showing compliance pressure: open "
-    "compliance/security/GRC roles, 'SOC 2 in progress', security questionnaires, "
-    "enterprise security reviews, audits. buyer_description = who buys the product. "
+    "compliance_signals = short verbatim phrases showing compliance pressure ON THIS "
+    "COMPANY ITSELF: its own open compliance/security/GRC roles, its own certification "
+    "or audit in progress ('working towards SOC 2'), its customers requiring security "
+    "reviews of it. NEVER take signals from product screenshots, demo or sample data "
+    "(made-up deals, names, tables shown inside the product UI), testimonials, blog "
+    "teasers, or navigation/support/contact links; when unsure, leave it out. "
+    "buyer_description = who buys the product. "
     "evidence = for every non-null field, a short snippet copied WORD FOR WORD from the "
     "text that supports it (for list fields, the snippet for the first item)."
 )
@@ -115,7 +119,10 @@ _EMAIL_SYS = (
     "Write a short cold email from Sprinto to the contact. " + SPRINTO_OFFER + " Rules: "
     "greet the contact by first name; open with ONE specific hook grounded in a given "
     "fact, and set hook_evidence_field to that fact's field; state nothing about the "
-    "company that is not in the given facts; human and plain, not salesy; under 120 "
+    "company that is not in the given facts, and never claim something is happening at "
+    "the company (an audit, a review, a deal) unless a fact says so in those words --- "
+    "describe what you saw ('saw you're hiring a Compliance Manager'), don't speculate "
+    "about their internal state; human and plain, not salesy; under 120 "
     "words; end with a low-friction ask; no placeholders like [Name] or {{...}}; sign "
     "off as 'The Sprinto team'. Format the body as a plain-text email: the greeting on "
     "its own line, then 2-3 short paragraphs, then the sign-off, separated by blank lines."
@@ -219,13 +226,21 @@ class GeminiLLM:
         self.usage: dict[str, list[int]] = defaultdict(lambda: [0, 0])
         self._schema_field = True
         self._sleep = __import__("time").sleep
+        self.draft_fallback: str | None = None
 
     def _post(self, model: str, body: dict) -> dict:
         """One generateContent call with backoff on 429/5xx (free-tier rate limits)."""
         delay = 4.0
         for attempt in range(4):
-            r = self._httpx.post(self.URL.format(model=model), json=body, timeout=90,
-                                 headers={"x-goog-api-key": self.key})
+            try:
+                r = self._httpx.post(self.URL.format(model=model), json=body, timeout=120,
+                                     headers={"x-goog-api-key": self.key})
+            except (self._httpx.TimeoutException, self._httpx.TransportError) as exc:
+                if attempt < 3:              # slow or dropped connection: wait and retry
+                    self._sleep(delay)
+                    delay *= 2
+                    continue
+                raise GeminiError(504, f"Gemini {model}: no response after retries ({exc})") from exc
             if r.status_code in (429, 500, 503) and attempt < 3:
                 self._sleep(delay)
                 delay *= 2
@@ -258,6 +273,8 @@ class GeminiLLM:
             try:
                 data = self._post(model, body)
             except GeminiError as exc:
+                if exc.status == 429:
+                    raise                          # quota used up: _post already waited and retried
                 if exc.status == 400 and self._schema_field and "schema" in str(exc).lower():
                     self._schema_field = False   # fall back to schema-in-prompt for the run
                     last = exc
@@ -292,8 +309,15 @@ class GeminiLLM:
         try:
             return self._json(self.model_draft, system, user, schema)
         except GeminiError as exc:
-            if exc.status == 404 and self.model_draft != self.model:
-                self.model_draft = self.model     # draft model not available to this key
+            if exc.status in (404, 429) and self.model_draft != self.model:
+                # drafting model missing for this key (404) or its quota is used up (429):
+                # draft with the extraction model for the rest of the run
+                why = "not available to this key" if exc.status == 404 else "quota used up"
+                import sys
+                print(f"[brendo] {self.model_draft} {why} --- drafting with {self.model} instead",
+                      file=sys.stderr)
+                self.draft_fallback = f"{self.model_draft} {why}; drafted with {self.model}"
+                self.model_draft = self.model
                 return self._json(self.model, system, user, schema)
             raise
 

@@ -5,58 +5,173 @@
     {
       "id": "already_certified",
       "label": "Already certified?",
-      "fields": ["certifications"],
-      "sources": ["/security", "/trust"],
+      "fields": [
+        "certifications"
+      ],
+      "sources": [
+        "/security",
+        "/trust"
+      ],
       "sufficient": "any named certification present",
       "limit": 1,
       "if_unanswered": "treat as not certified, flag",
-      "short_circuit": "disqualify_if_present"
+      "short_circuit": "disqualify_if_present",
+      "link_keywords": [
+        "security",
+        "trust",
+        "soc 2",
+        "soc2",
+        "soc-2",
+        "iso 27001",
+        "iso27001",
+        "compliance"
+      ]
     },
     {
       "id": "is_b2b_saas",
       "label": "B2B SaaS?",
-      "fields": ["is_saas", "buyer_description"],
-      "sources": ["/product", "/about"],
+      "fields": [
+        "is_saas",
+        "buyer_description"
+      ],
+      "sources": [
+        "/product",
+        "/about"
+      ],
       "sufficient": "the description names who buys it",
       "limit": 1,
       "if_unanswered": "manual_review",
-      "short_circuit": "disqualify_if_false"
+      "short_circuit": "disqualify_if_false",
+      "link_keywords": []
     },
     {
       "id": "right_stage",
       "label": "Right stage?",
-      "fields": ["funding_stage", "open_roles_count", "enterprise_customers"],
-      "sources": ["/careers", "/pricing", "/customers"],
+      "fields": [
+        "funding_stage",
+        "open_roles_count",
+        "enterprise_customers"
+      ],
+      "sources": [
+        "/careers",
+        "/pricing",
+        "/customers"
+      ],
       "sufficient": "funding stage named, OR 5+ open roles, OR enterprise pricing tier",
       "limit": 2,
       "if_unanswered": "qualify at lower rank, flagged",
-      "short_circuit": "none"
+      "short_circuit": "none",
+      "link_keywords": [
+        "careers",
+        "jobs",
+        "join us",
+        "we're hiring",
+        "open roles",
+        "work with us"
+      ]
     }
   ],
   "stage_thresholds": {
     "min_open_roles": 5
   },
-
   "_ranking_comment": "Ranking signals from the brief's ICP ('typically Series A-C', 'preparing for an audit or under pressure from enterprise customers'). They set the rank and feed the hook; they never gate qualification.",
   "ranking": {
-    "target_stages": ["series a", "series b", "series c"],
-    "early_stages": ["pre-seed", "seed"],
+    "target_stages": [
+      "series a",
+      "series b",
+      "series c"
+    ],
+    "early_stages": [
+      "pre-seed",
+      "seed"
+    ],
     "compliance_terms": [
-      "compliance manager", "compliance lead", "head of compliance", "grc",
-      "security engineer", "security lead", "head of security", "ciso",
-      "soc 2 in progress", "working towards soc 2", "pursuing soc 2", "soc 2 readiness",
-      "security questionnaire", "security review", "vendor assessment", "audit"
+      "compliance manager",
+      "compliance lead",
+      "head of compliance",
+      "grc",
+      "security engineer",
+      "security lead",
+      "head of security",
+      "ciso",
+      "soc 2 in progress",
+      "working towards soc 2",
+      "pursuing soc 2",
+      "soc 2 readiness",
+      "security questionnaire",
+      "security review",
+      "vendor assessment",
+      "audit"
+    ],
+    "other_stages": [
+      "bootstrapped",
+      "self-funded",
+      "profitable"
     ]
   },
-
   "_personas_comment": "Who Sprinto sells to, best first. PoC choice takes the lowest-rank persona whose keywords match the title; ties go to Hunter's confidence. No match = no contact (flagged), never 'nearest manager'.",
   "personas": [
-    {"id": "compliance_security_lead", "rank": 1,
-     "keywords": ["compliance", "grc", "security", "ciso", "risk", "trust"],
-     "seniority": ["head", "lead", "director", "vp", "vice president", "chief", "ciso", "manager", "officer"]},
-    {"id": "engineering_leader", "rank": 2,
-     "keywords": ["cto", "chief technology", "vp engineering", "vp of engineering", "head of engineering", "director of engineering"]},
-    {"id": "founder_exec", "rank": 3,
-     "keywords": ["founder", "co-founder", "ceo", "chief executive", "coo", "chief operating"]}
+    {
+      "id": "compliance_security_lead",
+      "rank": 1,
+      "keywords": [
+        "compliance",
+        "grc",
+        "security",
+        "ciso",
+        "risk",
+        "trust"
+      ],
+      "seniority": [
+        "head",
+        "lead",
+        "director",
+        "vp",
+        "vice president",
+        "chief",
+        "ciso",
+        "manager",
+        "officer"
+      ]
+    },
+    {
+      "id": "engineering_leader",
+      "rank": 2,
+      "keywords": [
+        "cto",
+        "chief technology",
+        "vp engineering",
+        "vp of engineering",
+        "head of engineering",
+        "director of engineering"
+      ]
+    },
+    {
+      "id": "founder_exec",
+      "rank": 3,
+      "keywords": [
+        "founder",
+        "co-founder",
+        "ceo",
+        "chief executive",
+        "coo",
+        "chief operating"
+      ]
+    }
+  ],
+  "_links_comment": "Before guessing a path, the loop follows a link the company itself publishes on its homepage whose URL or text matches a question's link_keywords (e.g. its Trust center, a SOC 2 announcement, its jobs board). A 404 does not use up a question's limit; every fetch counts toward the cap.",
+  "link_denylist": [
+    "trustpilot.",
+    "g2.com",
+    "capterra.",
+    "twitter.com",
+    "x.com",
+    "linkedin.com",
+    "facebook.com",
+    "youtube.com",
+    "github.com",
+    "instagram.com",
+    "producthunt.com",
+    "news.ycombinator.com"
   ]
 }

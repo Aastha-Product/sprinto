@@ -155,3 +155,25 @@ def test_gemini_run_end_to_end_offline_sites(settings, monkeypatch):
     r = run_batch(["acme.example"], settings, offline=True, force=True)[0]
     assert r.status == "drafted", r.decisions
     assert r.email.subject == "Acme + SOC 2"
+
+
+def test_timeout_is_retried(gem):
+    import httpx
+    gem.replies += [httpx.ReadTimeout("The read operation timed out"), ok(EXTRACTED)]
+    orig = gem._httpx.post
+
+    def post(*a, **k):
+        r = orig(*a, **k)
+        if isinstance(r, Exception):
+            raise r
+        return r
+    gem._httpx.post = post
+    assert gem.extract_fields("x").name == "Acme"
+
+
+def test_draft_quota_used_up_falls_back_to_extraction_model(gem):
+    email = {"subject": "s", "body": "Hi Jane", "hook": "h", "hook_evidence_field": "funding_stage"}
+    gem.replies += [err(429, "You exceeded your current quota")] * 4 + [ok(email)]
+    assert gem.write_email({}, {"name": "Jane"}, [])["subject"] == "s"
+    assert "flash-lite" in gem.calls[-1]["url"] and gem.draft_fallback
+    assert gem.model_draft == gem.model                       # stays switched for the run

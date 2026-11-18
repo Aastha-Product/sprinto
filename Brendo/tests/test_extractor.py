@@ -32,7 +32,7 @@ def test_verify_ignores_case_and_punctuation():
 
 def test_verify_filters_list_items():
     f = CompanyFields(certifications=["SOC 2"], compliance_signals=["Compliance Manager", "Hiring a CISO"])
-    verify(f, PAGE)
+    verify(f, PAGE, jobs_page=True)
     assert f.certifications == []                            # SOC 2 isn't on this page
     assert f.compliance_signals == ["Compliance Manager"]
 
@@ -45,3 +45,23 @@ def test_merge_fills_gaps_without_overwriting():               # T-EXT-1
     assert acc.is_saas is True                               # homepage answer kept
     assert acc.funding_stage == "Series B"
     assert acc.compliance_signals == ["Compliance Manager"]
+
+
+def test_question_style_link_text_is_not_a_compliance_signal():
+    page = PAGE + "\nSecurity questions or concerns?"
+    f = CompanyFields(compliance_signals=["Security questions or concerns?", "Compliance Manager"])
+    dropped = verify(f, page, jobs_page=True)
+    assert f.compliance_signals == ["Compliance Manager"]
+    assert any("questions or concerns" in d for d in dropped)
+
+
+def test_signal_off_a_jobs_page_must_be_first_person():
+    page = "Synthred Aug 12 USD 62,500 Isla Harrington Security review underway 25d\nOur team answers every security questionnaire buyers send us."
+    f = CompanyFields(compliance_signals=["Security review underway",
+                                          "Our team answers every security questionnaire buyers send us."])
+    dropped = verify(f, page)
+    assert f.compliance_signals == ["Our team answers every security questionnaire buyers send us."]
+    assert any("demo data" in d for d in dropped)
+    g = CompanyFields(compliance_signals=["Compliance Manager"])
+    verify(g, "Open roles: Compliance Manager", jobs_page=True)
+    assert g.compliance_signals == ["Compliance Manager"]
