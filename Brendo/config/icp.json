@@ -1,0 +1,39 @@
+{
+  "_comment": "Sprinto ICP as the Evidence Map (deck slide 40). Drives extraction, the loop and qualification. Edit thresholds here, not in code.",
+  "max_fetches_beyond_homepage": 4,
+  "questions": [
+    {
+      "id": "already_certified",
+      "label": "Already certified?",
+      "fields": ["certifications"],
+      "sources": ["/security", "/trust"],
+      "sufficient": "any named certification present",
+      "limit": 1,
+      "if_unanswered": "treat as not certified, flag",
+      "short_circuit": "disqualify_if_present"
+    },
+    {
+      "id": "is_b2b_saas",
+      "label": "B2B SaaS?",
+      "fields": ["is_saas", "buyer_description"],
+      "sources": ["/product", "/about"],
+      "sufficient": "the description names who buys it",
+      "limit": 1,
+      "if_unanswered": "manual_review",
+      "short_circuit": "disqualify_if_false"
+    },
+    {
+      "id": "right_stage",
+      "label": "Right stage?",
+      "fields": ["funding_stage", "open_roles_count", "enterprise_customers"],
+      "sources": ["/careers", "/pricing", "/customers"],
+      "sufficient": "funding stage named, OR 5+ open roles, OR enterprise pricing tier",
+      "limit": 2,
+      "if_unanswered": "qualify at lower rank, flagged",
+      "short_circuit": "none"
+    }
+  ],
+  "stage_thresholds": {
+    "min_open_roles": 5
+  }
+}

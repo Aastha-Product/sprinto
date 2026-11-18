@@ -1,0 +1,7 @@
+# Real-mode dependencies. The pipeline also runs fully offline in mock mode
+# using only the Python standard library (no installs required) --- see README.
+httpx>=0.27            # request-based fetch
+beautifulsoup4>=4.12   # HTML cleaning
+anthropic>=0.39        # LLM (real mode); any other provider can be slotted into llm.py
+# Optional:
+# playwright>=1.47      # headless-browser fallback for JS-rendered pages (then: playwright install chromium)
