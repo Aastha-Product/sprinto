@@ -62,7 +62,8 @@ Fill in `.env` (the template is `.env.example`), then run `brendo --check`. Each
 
 | Key | Enables | Without it |
 | --- | --- | --- |
-| `ANTHROPIC_API_KEY` | Extraction, pain points and drafting with Claude (structured outputs) | Offline keyword mock |
+| `GEMINI_API_KEY` | Extraction, pain points and drafting with Gemini (`gemini-3.5-flash-lite`, `gemini-4-hydrogen`) | Offline keyword mock |
+| `ANTHROPIC_API_KEY` | The same with Claude (Haiku 5.5, Sonnet 5.5) instead | Offline keyword mock |
 | `HUNTER_API_KEY` | Live PoC lookup | Placeholder contact (flagged) |
 | `inputs/contacts.csv` | Apollo lookups by hand: `domain,name,role,email` | Hunter, or mock |
 | `GMAIL_ADDRESS` + `GMAIL_APP_PASSWORD` | Real Gmail send | Writes to `data/outbox/` |
@@ -70,6 +71,7 @@ Fill in `.env` (the template is `.env.example`), then run `brendo --check`. Each
 
 **Where to get each key**
 
+- **`GEMINI_API_KEY`:** aistudio.google.com → Get API key (starts with `AIza`). Both default models have a free tier, which is rate-limited; Brendo waits and retries when it hits the limit. The cost line in the report assumes paid rates. If your key can't use `gemini-4-hydrogen`, drafting falls back to the extraction model; or set `BRENDO_GEMINI_MODEL_DRAFT`.
 - **`ANTHROPIC_API_KEY`:** console.anthropic.com. Extraction and pain points use Haiku 5.5 at low effort; drafting uses Sonnet 5.5 with server-side refusal fallback. This is the deck's "cheap model for volume" cost dial.
 - **`HUNTER_API_KEY`:** hunter.io. The free tier allows 25 domain searches a month, and results are cached. Alternatively, look people up in Apollo and add a row per domain to `inputs/contacts.csv`.
 - **Gmail:** turn on 2-step verification, then create an **App Password** at myaccount.google.com. Put it in `GMAIL_APP_PASSWORD` and your address in `GMAIL_ADDRESS`.
@@ -86,7 +88,7 @@ Fill in `.env` (the template is `.env.example`), then run `brendo --check`. Each
 pytest -q
 ```
 
-There are 56 offline tests, with no keys and no network. They cover the cleaner, the scraper (robots, blocks, browser fallback, polite delay), evidence verification, every ICP path and ranking, persona choice, draft checks and redraft, the send guard, the cache and decision log, the DB upgrade, export and review, and the CLI. CI runs them on every push (`.github/workflows/tests.yml`).
+There are 68 offline tests, with no keys and no network. They cover the cleaner, the scraper (robots, blocks, browser fallback, polite delay), evidence verification, both LLM clients against fake servers, every ICP path and ranking, persona choice, draft checks and redraft, the send guard, the cache and decision log, the DB upgrade, export and review, and the CLI. CI runs them on every push (`.github/workflows/tests.yml`).
 
 ## Layout
 
@@ -100,6 +102,7 @@ data/             SQLite + mock outbox (gitignored)     out/       campaign reco
 
 ## Design notes
 
+- **Two providers:** `llm.py` has a Claude client (Anthropic SDK, structured outputs) and a Gemini client (REST, `responseJsonSchema`, falling back to schema-in-prompt if the API rejects it). Both return the same named fields, so the rest of the pipeline doesn't know which ran.
 - **Deterministic vs LLM:** the model extracts facts and writes prose. *Code* checks that each fact's evidence is on the page, decides whether fields are filled, renders the verdict, picks the contact and fixes the recipient.
 - **Bounded loop:** `BRENDO_MAX_FETCHES` (default 4) caps fetches beyond the homepage. At the cap the company is flagged for a human, which counts as a designed handoff, not a failure.
 - **Failures:** a homepage that can't be reached ends the company as `failed`, with no further fetches. Failures are never cached, so the next run retries them. One failure never stops the batch.

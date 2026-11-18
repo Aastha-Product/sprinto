@@ -1,4 +1,4 @@
-"""LLM access: a real Anthropic Claude client and an offline heuristic mock.
+"""LLM access: Anthropic Claude or Google Gemini, plus an offline heuristic mock.
 
 Only the *reasoning* steps use a model: extract fields, infer pain points, write the
 email. Qualification, PoC choice and the recipient are decided in code.
@@ -187,6 +187,165 @@ class RealLLM:
         return self._json(self.model_draft, _EMAIL_SYS, json.dumps(payload), EMAIL_SCHEMA)
 
 
+# ---------- Real client (Google Gemini, REST over httpx) ----------
+
+def _gemini_schema(node):
+    """JSON Schema for Gemini: nullable anyOf -> a type array ["string", "null"]."""
+    if isinstance(node, dict):
+        any_of = node.get("anyOf")
+        if any_of and all(isinstance(x, dict) and set(x) == {"type"} for x in any_of):
+            return {"type": [x["type"] for x in any_of]}
+        return {k: _gemini_schema(v) for k, v in node.items()}
+    if isinstance(node, list):
+        return [_gemini_schema(x) for x in node]
+    return node
+
+
+class GeminiLLM:
+    """Gemini via the generateContent REST API (key in the x-goog-api-key header).
+
+    JSON output: responseMimeType application/json + responseJsonSchema. If the API rejects
+    the schema field, the client switches (once, for the whole run) to putting the schema in
+    the instructions; replies are parsed and validated the same way either way.
+    """
+    URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+
+    def __init__(self, settings: Settings):
+        import httpx  # lazy
+        self._httpx = httpx
+        self.key = settings.gemini_api_key
+        self.model, self.model_draft = settings.gemini_model, settings.gemini_model_draft
+        self.usage: dict[str, list[int]] = defaultdict(lambda: [0, 0])
+        self._schema_field = True
+        self._sleep = __import__("time").sleep
+
+    def _post(self, model: str, body: dict) -> dict:
+        """One generateContent call with backoff on 429/5xx (free-tier rate limits)."""
+        delay = 4.0
+        for attempt in range(4):
+            r = self._httpx.post(self.URL.format(model=model), json=body, timeout=90,
+                                 headers={"x-goog-api-key": self.key})
+            if r.status_code in (429, 500, 503) and attempt < 3:
+                self._sleep(delay)
+                delay *= 2
+                continue
+            if r.status_code >= 400:
+                try:
+                    msg = r.json().get("error", {}).get("message", r.text)
+                except Exception:
+                    msg = r.text
+                raise GeminiError(r.status_code, f"Gemini {r.status_code} ({model}): {msg[:200]}")
+            return r.json()
+        raise GeminiError(429, f"Gemini {model}: still rate-limited after retries")
+
+    def _json(self, model: str, system: str, user: str, schema: dict) -> dict:
+        gschema = _gemini_schema(schema)
+        last: Exception | None = None
+        for _ in range(2):
+            body = {
+                "systemInstruction": {"parts": [{"text": system}]},
+                "contents": [{"role": "user", "parts": [{"text": user}]}],
+                "generationConfig": {"responseMimeType": "application/json",
+                                     "maxOutputTokens": 8192},
+            }
+            if self._schema_field:
+                body["generationConfig"]["responseJsonSchema"] = gschema
+            else:
+                body["systemInstruction"]["parts"][0]["text"] = (
+                    system + "\n\nReply with ONLY a JSON object matching this JSON Schema:\n"
+                    + json.dumps(gschema))
+            try:
+                data = self._post(model, body)
+            except GeminiError as exc:
+                if exc.status == 400 and self._schema_field and "schema" in str(exc).lower():
+                    self._schema_field = False   # fall back to schema-in-prompt for the run
+                    last = exc
+                    continue
+                if exc.status in (400, 401, 403, 404):
+                    raise                          # bad key / model / request: not retryable
+                last = exc
+                continue
+            um = data.get("usageMetadata") or {}
+            self.usage[model][0] += int(um.get("promptTokenCount") or 0)
+            self.usage[model][1] += int(um.get("candidatesTokenCount") or 0) + int(um.get("thoughtsTokenCount") or 0)
+            block = (data.get("promptFeedback") or {}).get("blockReason")
+            cands = data.get("candidates") or []
+            if block or not cands:
+                last = RuntimeError(f"Gemini blocked the request ({block or 'no candidates'})")
+                continue
+            finish = cands[0].get("finishReason")
+            if finish not in (None, "STOP"):
+                last = RuntimeError(f"Gemini stopped early (finishReason={finish})")
+                continue
+            text = "".join(p.get("text", "") for p in (cands[0].get("content") or {}).get("parts", [])
+                           if not p.get("thought"))
+            try:
+                out = json.loads(_strip_fence(text))
+                _check_required(out, schema)
+                return out
+            except Exception as exc:
+                last = RuntimeError(f"Gemini reply was not valid JSON for the schema: {exc}")
+        raise RuntimeError(f"LLM call failed after retry: {last}")
+
+    def _draft_json(self, system: str, user: str, schema: dict) -> dict:
+        try:
+            return self._json(self.model_draft, system, user, schema)
+        except GeminiError as exc:
+            if exc.status == 404 and self.model_draft != self.model:
+                self.model_draft = self.model     # draft model not available to this key
+                return self._json(self.model, system, user, schema)
+            raise
+
+    def ping(self) -> bool:
+        body = {"contents": [{"role": "user", "parts": [{"text": "ping"}]}],
+                "generationConfig": {"maxOutputTokens": 16}}
+        self._post(self.model, body)
+        try:
+            self._post(self.model_draft, body)
+        except GeminiError as exc:
+            if exc.status != 404:
+                raise
+            raise RuntimeError(f"drafting model '{self.model_draft}' not found for this key; "
+                               f"set BRENDO_GEMINI_MODEL_DRAFT (extraction model works)") from exc
+        return True
+
+    def extract_fields(self, text: str) -> CompanyFields:
+        return _fields_from_dict(self._json(self.model, _EXTRACT_SYS, text[:12000], EXTRACT_SCHEMA))
+
+    def infer_pain_points(self, company: dict, contact: dict) -> list[dict]:
+        user = json.dumps({"facts": company, "contact": contact})
+        return self._json(self.model, _PAINS_SYS, user, PAINS_SCHEMA).get("pains", [])
+
+    def write_email(self, company: dict, contact: dict, pains: list[dict],
+                    feedback: list[str] | None = None) -> dict:
+        payload = {"facts": company, "contact": contact, "pains": pains}
+        if feedback:
+            payload["fix_these_problems_from_the_last_draft"] = feedback
+        return self._draft_json(_EMAIL_SYS, json.dumps(payload), EMAIL_SCHEMA)
+
+
+class GeminiError(RuntimeError):
+    def __init__(self, status: int, msg: str):
+        super().__init__(msg)
+        self.status = status
+
+
+def _strip_fence(text: str) -> str:
+    t = text.strip()
+    if t.startswith("```"):
+        t = t.split("\n", 1)[1] if "\n" in t else t
+        t = t.rsplit("```", 1)[0]
+    return t.strip()
+
+
+def _check_required(out: dict, schema: dict) -> None:
+    if not isinstance(out, dict):
+        raise ValueError("reply is not an object")
+    missing = [k for k in schema.get("required", []) if k not in out]
+    if missing:
+        raise ValueError(f"missing keys {missing}")
+
+
 # ---------- Offline heuristic mock (no network, no keys) ----------
 
 _CERTS = ["SOC 2", "SOC2", "ISO 27001", "ISO27001", "GDPR", "HIPAA", "PCI DSS", "PCI-DSS"]
@@ -347,4 +506,8 @@ def _fact_phrase(company: dict, field: str) -> str:
 
 
 def get_llm(settings: Settings) -> LLM:
-    return MockLLM() if settings.llm_is_mock else RealLLM(settings)
+    if settings.provider == "gemini":
+        return GeminiLLM(settings)
+    if settings.provider == "anthropic":
+        return RealLLM(settings)
+    return MockLLM()

@@ -36,7 +36,7 @@ def _read_domains(path: Path) -> list[str]:
 
 def _check(settings) -> int:
     print("\nBrendo readiness check\n" + "-" * 44)
-    for mod in ("httpx", "bs4", "anthropic"):
+    for mod in ("httpx", "bs4") + (("anthropic",) if settings.provider == "anthropic" else ()):
         try:
             __import__(mod)
             print(f"  dep {mod:10} ok")
@@ -49,7 +49,11 @@ def _check(settings) -> int:
         print(f"  icp config    ERROR: {exc}")
     print(f"  samples dir   {'ok' if settings.samples_dir.exists() else 'missing'}")
 
-    print(f"  LLM           {'mock (set ANTHROPIC_API_KEY)' if settings.llm_is_mock else f'live: {settings.llm_model} / {settings.llm_model_draft}'}")
+    m_ext, m_draft = settings.active_models()
+    print(f"  LLM           {'mock (set GEMINI_API_KEY or ANTHROPIC_API_KEY)' if settings.llm_is_mock else f'live: {settings.provider} --- {m_ext} / {m_draft}'}")
+    if getattr(settings, "key_was_misplaced", False):
+        print("  NOTE          ANTHROPIC_API_KEY holds a Google key --- using it for Gemini. "
+              "Move it to GEMINI_API_KEY to silence this.")
     n_contacts = len(poc.load_contacts(settings.contacts_path))
     poc_mode = "mock (set HUNTER_API_KEY)" if settings.hunter_is_mock else "live: hunter.io"
     print(f"  PoC           {poc_mode}; contacts.csv: {n_contacts} hardcoded domain(s)")
@@ -58,15 +62,15 @@ def _check(settings) -> int:
               " put Apollo lookups in inputs/contacts.csv instead")
     print(f"  Send          {'mock-outbox (set GMAIL_ADDRESS + GMAIL_APP_PASSWORD)' if settings.gmail_is_mock else 'live: gmail'}")
     print(f"  Recipient     {settings.send_to}" + ("   <-- placeholder: live sends will be refused!" if settings.send_to_is_placeholder else ""))
-    for m in {settings.llm_model, settings.llm_model_draft}:
+    for m in ({} if settings.llm_is_mock else set(settings.active_models())):
         if settings.price_for(m) is None:
             print(f"  Price         no price set for {m}; cost won't be estimated (BRENDO_PRICE_...)")
 
     if not settings.llm_is_mock:
         try:
-            from .llm import RealLLM
-            RealLLM(settings).ping()
-            print("  LLM ping      ok (key + model work)")
+            from .llm import get_llm
+            get_llm(settings).ping()
+            print("  LLM ping      ok (key + models answer)")
         except Exception as exc:
             print(f"  LLM ping      FAILED: {str(exc)[:120]}")
     print("-" * 44)
@@ -152,7 +156,7 @@ def main(argv: list[str] | None = None) -> int:
         input_file = str(path)
 
     mode = "offline/samples" if args.offline else "live web"
-    llm_mode = "mock" if settings.llm_is_mock else settings.llm_model
+    llm_mode = "mock" if settings.llm_is_mock else f"{settings.provider}:{settings.active_models()[0]}"
     print(f"Running {len(domains)} domain(s) --- source: {mode}, llm: {llm_mode}, "
           f"poc: contacts.csv + {'mock' if settings.hunter_is_mock else 'hunter'}, "
           f"send: {'mock-outbox' if settings.gmail_is_mock else 'gmail'}")
