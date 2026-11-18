@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -24,8 +25,19 @@ def load_dotenv(path: Path | None = None) -> None:
         if not line or line.startswith("#") or "=" not in line:
             continue
         key, _, val = line.partition("=")
-        key, val = key.strip(), val.strip().strip('"').strip("'")
-        os.environ.setdefault(key, val)
+        os.environ.setdefault(key.strip(), _dotenv_value(val))
+
+
+def _dotenv_value(raw: str) -> str:
+    """Value of one .env line: quoted values are taken as-is; otherwise a trailing
+    ' # comment' is dropped (so `KEY=value   # note` gives 'value')."""
+    val = raw.strip()
+    if val[:1] in ('"', "'"):
+        q = val[0]
+        end = val.find(q, 1)
+        return val[1:end] if end != -1 else val[1:]
+    cut = re.search(r"\s#", val)
+    return (val[:cut.start()] if cut else val).strip()
 
 
 @dataclass
