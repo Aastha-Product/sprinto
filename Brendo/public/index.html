@@ -1,0 +1,392 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Brendo — Cold Outreach</title>
+<meta name="robots" content="noindex,nofollow">
+<style>
+:root{
+  --bg:#ffffff; --surface:#f5f7f8; --surface-2:#eceff1; --fg:#161b22; --muted:#596573;
+  --border:#dfe4e8; --accent:#0d8f84; --accent-weak:#d7efec; --accent-fg:#0b6f67;
+  --ok:#1a7f4b; --warn:#9a6a00; --crit:#b23b3b; --code:#0b4f49;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#0e1319; --surface:#151b23; --surface-2:#1c242e; --fg:#e7ecf1; --muted:#9aa6b4;
+  --border:#283440; --accent:#2fd4c2; --accent-weak:#113a37; --accent-fg:#5fe3d4;
+  --ok:#49c17e; --warn:#e0b24d; --crit:#f07d7d; --code:#8fe9df; color-scheme:dark;
+}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.55 var(--sans);-webkit-font-smoothing:antialiased}
+.wrap{max-width:980px;margin:0 auto;padding:28px 16px 80px}
+header{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:8px 16px;margin-bottom:22px}
+h1{font-size:24px;margin:0;font-weight:650;letter-spacing:-.01em}
+h1 small{display:block;font-size:13px;font-weight:500;color:var(--muted);letter-spacing:0;margin-top:2px}
+h2{font-size:16px;margin:0 0 10px;font-weight:650}
+a{color:var(--accent-fg)}
+.card{border:1px solid var(--border);border-radius:12px;background:var(--surface);padding:16px 18px;margin:0 0 16px}
+.row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+label{font-size:13px;color:var(--muted)}
+input[type=password],input[type=text],textarea,select{font:inherit;color:var(--fg);background:var(--bg);
+  border:1px solid var(--border);border-radius:8px;padding:8px 10px}
+textarea{width:100%;min-height:128px;font-family:var(--mono);font-size:13px;resize:vertical}
+input[type=password]{width:min(320px,100%)}
+button{font:inherit;font-weight:600;border-radius:8px;padding:8px 14px;cursor:pointer;
+  border:1px solid var(--accent);background:var(--accent);color:#fff}
+@media (prefers-color-scheme:dark){button{color:#06201d}}
+button.ghost{background:transparent;color:var(--accent-fg)}
+button:disabled{opacity:.5;cursor:not-allowed}
+.check{display:inline-flex;gap:6px;align-items:center;font-size:13.5px;color:var(--fg)}
+.muted{color:var(--muted)}
+.small{font-size:13px}
+.err{color:var(--crit)}
+.kv{display:grid;grid-template-columns:max-content 1fr;gap:4px 14px;font-size:13.5px}
+.kv dt{color:var(--muted)} .kv dd{margin:0;font-family:var(--mono);font-size:12.8px;word-break:break-word}
+.chip{display:inline-block;font:600 11px/1 var(--mono);text-transform:uppercase;letter-spacing:.05em;
+  padding:5px 8px;border-radius:999px;background:var(--surface-2);color:var(--muted);white-space:nowrap}
+.chip.sent{background:color-mix(in srgb,var(--ok) 18%,var(--bg));color:var(--ok)}
+.chip.drafted,.chip.qualified,.chip.qualified_flagged{background:var(--accent-weak);color:var(--accent-fg)}
+.chip.flagged,.chip.running{background:color-mix(in srgb,var(--warn) 18%,var(--bg));color:var(--warn)}
+.chip.failed{background:color-mix(in srgb,var(--crit) 15%,var(--bg));color:var(--crit)}
+.chip.disqualified{background:var(--surface-2);color:var(--muted)}
+.progress{height:6px;background:var(--surface-2);border-radius:99px;overflow:hidden;margin:12px 0 4px}
+.progress>div{height:100%;width:0;background:var(--accent);transition:width .3s}
+.co{border:1px solid var(--border);border-radius:12px;background:var(--bg);margin:0 0 12px;overflow:hidden}
+.co>summary{list-style:none;cursor:pointer;display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center;padding:12px 14px}
+.co>summary::-webkit-details-marker{display:none}
+.co .dom{font-weight:650;font-family:var(--mono);font-size:14px}
+.co .meta{margin-left:auto;font-size:12.5px;color:var(--muted)}
+.co .body{padding:0 14px 14px;border-top:1px solid var(--border)}
+.sec{margin-top:12px}
+.sec h3{font-size:11.5px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin:0 0 4px;font-weight:650}
+.sec ul{margin:0;padding-left:18px} .sec li{margin:2px 0}
+pre.mail{white-space:pre-wrap;word-break:break-word;font:13px/1.55 var(--sans);background:var(--surface);
+  border:1px solid var(--border);border-radius:9px;padding:12px;margin:4px 0 0}
+.log{font-family:var(--mono);font-size:12px;line-height:1.5;background:var(--surface);border-radius:8px;
+  padding:10px;margin:6px 0 0;max-height:280px;overflow:auto;white-space:pre-wrap;word-break:break-word}
+.review{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;margin-top:12px;padding-top:12px;border-top:1px dashed var(--border)}
+.review input[type=text]{flex:1;min-width:180px}
+.stats{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0 0}
+.stat{border:1px solid var(--border);border-radius:9px;padding:8px 12px;background:var(--bg);min-width:120px}
+.stat b{display:block;font-size:18px}
+.stat span{font-size:12px;color:var(--muted)}
+.banner{border-left:3px solid var(--accent);background:var(--accent-weak);padding:10px 12px;border-radius:0 8px 8px 0;font-size:13.5px;margin:10px 0 0}
+.banner.bad{border-left-color:var(--crit);background:color-mix(in srgb,var(--crit) 12%,var(--bg))}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Brendo<small>Automated, defensible cold outreach for Sprinto: scrape → extract → qualify → contact → pains → draft → send to yourself</small></h1>
+    <a href="/blueprint.html" class="small">Technical blueprint →</a>
+  </header>
+
+  <section class="card" id="lockCard">
+    <h2>1 · Unlock</h2>
+    <p class="small muted" style="margin-top:0">The site password is the <code>BRENDO_WEB_PASSWORD</code> value set in Vercel. It stays in this browser tab only.</p>
+    <form class="row" id="lockForm">
+      <input type="password" id="pw" placeholder="Site password" autocomplete="current-password">
+      <button type="submit">Unlock</button>
+    </form>
+    <p id="lockMsg" class="small" hidden></p>
+  </section>
+
+  <section class="card" id="checkCard" hidden>
+    <div class="row" style="justify-content:space-between"><h2 style="margin:0">2 · Setup check</h2>
+      <button class="ghost" id="pingBtn">Test the AI key</button></div>
+    <dl class="kv" id="checkOut" style="margin:12px 0 0"></dl>
+    <div id="checkBanner"></div>
+  </section>
+
+  <section class="card" id="runCard" hidden>
+    <h2>3 · Run the pipeline</h2>
+    <label for="domains">Company domains, one per line (about 1 minute each)</label>
+    <textarea id="domains" spellcheck="false">documenso.com
+plausible.io
+attio.com
+resend.com
+dub.co</textarea>
+    <div class="row" style="margin-top:10px">
+      <label class="check"><input type="checkbox" id="force"> Ignore cache (research again)</label>
+      <label class="check"><input type="checkbox" id="offline"> Demo mode: bundled sample sites</label>
+    </div>
+    <div class="row" style="margin-top:12px">
+      <button id="runBtn">Run</button>
+      <button class="ghost" id="stopBtn" hidden>Stop after this company</button>
+      <span id="runMsg" class="small muted"></span>
+    </div>
+    <div class="progress" id="prog" hidden><div></div></div>
+  </section>
+
+  <section id="resultsCard" hidden>
+    <div class="card">
+      <div class="row" style="justify-content:space-between">
+        <h2 style="margin:0">4 · Run report</h2>
+        <div class="row">
+          <button class="ghost" id="csvBtn">Download CSV</button>
+          <button class="ghost" id="mdBtn">Download Markdown</button>
+        </div>
+      </div>
+      <div class="stats" id="stats"></div>
+      <p class="small muted" style="margin:10px 0 0">Emails go only to the recipient shown in the setup check. Each has a “BRENDO REVIEW NOTE” under it. Check that inbox, and Sent / All Mail too when sender and recipient are the same address.</p>
+    </div>
+    <div id="results"></div>
+    <div class="card">
+      <h2>5 · Review (the kill-criterion numbers)</h2>
+      <p class="small muted" style="margin-top:0">Mark each drafted email above. Targets: rewrite rate under 20% (shut down above 50%) and PoC accuracy of at least 60%. Your marks go into the CSV export.</p>
+      <div class="stats" id="reviewStats"></div>
+    </div>
+  </section>
+</div>
+
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const SAMPLES = ["acme.example","securedhq.example","sunrisebakery.example","headerhero.example","thinsignal.example","lateco.example"];
+  const store = {
+    get(k, s) { try { const v = (s ? sessionStorage : localStorage).getItem(k); return v ? JSON.parse(v) : null; } catch { return null; } },
+    set(k, v, s) { try { (s ? sessionStorage : localStorage).setItem(k, JSON.stringify(v)); } catch {} },
+  };
+  let password = store.get("brendo.pw", true) || "";
+  let results = store.get("brendo.results") || [];
+  let reviews = store.get("brendo.reviews") || {};
+  // a run interrupted by closing the tab must not look as if it is still going
+  results.forEach((r) => { if (r.status === "running" || r.status === "pending") r.status = "skipped"; });
+  let stopping = false, running = false;
+
+  function el(tag, attrs = {}, ...kids) {
+    const n = document.createElement(tag);
+    for (const [k, v] of Object.entries(attrs)) {
+      if (k === "class") n.className = v; else if (k === "text") n.textContent = v; else n.setAttribute(k, v);
+    }
+    for (const k of kids) if (k != null) n.append(k);
+    return n;
+  }
+
+  async function api(action, body, signal) {
+    let res;
+    try {
+      res = await fetch(`/api/${action}`, {
+        method: "POST", signal,
+        headers: { "Content-Type": "application/json", "X-Brendo-Password": password },
+        body: JSON.stringify(body || {}),
+      });
+    } catch (e) { throw new Error("Could not reach the server: " + e.message); }
+    let data = null;
+    try { data = await res.json(); } catch {}
+    if (!res.ok) {
+      const msg = (data && data.error) || (res.status === 504 ? "Timed out on the server (the site took too long)." : `HTTP ${res.status}`);
+      const err = new Error(msg); err.status = res.status; throw err;
+    }
+    return data;
+  }
+
+  // ---- 1 · unlock -------------------------------------------------------------
+  $("lockForm").addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    password = $("pw").value;
+    await unlock(false);
+  });
+
+  async function unlock(silent) {
+    const msg = $("lockMsg");
+    msg.hidden = silent; msg.className = "small muted"; msg.textContent = "Checking…";
+    try {
+      const r = await api("check", { ping: false });
+      store.set("brendo.pw", password, true);
+      $("lockCard").hidden = true;
+      $("checkCard").hidden = $("runCard").hidden = false;
+      showCheck(r);
+      renderAll();
+    } catch (e) {
+      // on the silent first try with no saved password, just show the form
+      msg.hidden = silent && !password && e.status === 401;
+      msg.className = "small err"; msg.textContent = e.message;
+      $("lockCard").hidden = false;
+    }
+  }
+
+  // ---- 2 · setup check --------------------------------------------------------
+  function showCheck(r) {
+    const out = $("checkOut"); out.replaceChildren();
+    const add = (k, v) => out.append(el("dt", { text: k }), el("dd", { text: v }));
+    add("LLM", r.llm + (r.models ? ` — ${r.models.join(" / ")}` : ""));
+    add("PoC", r.poc + `; contacts.csv: ${r.contacts_file} hardcoded`);
+    add("Send", r.send);
+    add("Recipient", r.recipient + (r.recipient_placeholder ? "  ← placeholder: live sends refused" : ""));
+    if (r.ping) add("AI key test", r.ping);
+    if (r.note) add("Note", r.note);
+    const b = $("checkBanner"); b.replaceChildren();
+    if (!r.ok) b.append(el("div", { class: "banner bad", text: "Something above needs fixing in Vercel → Settings → Environment Variables, then redeploy." }));
+    else if (r.llm === "mock" || r.poc === "mock" || r.send.startsWith("mock"))
+      b.append(el("div", { class: "banner", text: "Anything marked mock still runs end to end, with stand-ins instead of the live service." }));
+  }
+  $("pingBtn").addEventListener("click", async () => {
+    const btn = $("pingBtn"); btn.disabled = true; btn.textContent = "Testing…";
+    try { showCheck(await api("check", { ping: true })); }
+    catch (e) { $("checkBanner").replaceChildren(el("div", { class: "banner bad", text: e.message })); }
+    finally { btn.disabled = false; btn.textContent = "Test the AI key"; }
+  });
+
+  // ---- 3 · run ----------------------------------------------------------------
+  $("offline").addEventListener("change", (e) => {
+    if (e.target.checked) $("domains").value = SAMPLES.join("\n");
+  });
+  $("stopBtn").addEventListener("click", () => { stopping = true; $("stopBtn").disabled = true; $("runMsg").textContent = "Stopping after this company…"; });
+
+  $("runBtn").addEventListener("click", async () => {
+    if (running) return;
+    const seen = new Set();
+    const domains = $("domains").value.split(/[\s,]+/).map((d) => d.trim()).filter((d) => d && d.toLowerCase() !== "domain" && !seen.has(d) && seen.add(d));
+    if (!domains.length) { $("runMsg").textContent = "Add at least one domain."; return; }
+    running = true; stopping = false;
+    $("runBtn").disabled = true; $("stopBtn").hidden = false; $("stopBtn").disabled = false;
+    $("prog").hidden = false;
+    results = domains.map((d) => ({ domain: d, status: "pending" }));
+    reviews = {};
+    persist(); renderAll();
+    const offline = $("offline").checked, force = $("force").checked;
+    for (let i = 0; i < domains.length; i++) {
+      if (stopping) { results.slice(i).forEach((r) => { r.status = "skipped"; }); break; }
+      results[i] = { domain: domains[i], status: "running" };
+      $("runMsg").textContent = `Researching ${domains[i]} (${i + 1} of ${domains.length})…`;
+      $("prog").firstElementChild.style.width = `${(i / domains.length) * 100}%`;
+      renderAll();
+      try {
+        results[i] = await api("run", { domain: domains[i], offline, force });
+      } catch (e) {
+        if (e.status === 401 || e.status === 503) { results[i] = { domain: domains[i], status: "failed", error: e.message }; stopping = true; }
+        else results[i] = { domain: domains[i], status: "failed", error: e.message, decisions: [] };
+      }
+      persist(); renderAll();
+    }
+    $("prog").firstElementChild.style.width = "100%";
+    $("runMsg").textContent = stopping ? "Stopped." : "Done.";
+    running = false; $("runBtn").disabled = false; $("stopBtn").hidden = true;
+    renderAll();
+  });
+
+  function persist() { store.set("brendo.results", results); store.set("brendo.reviews", reviews); }
+
+  // ---- 4 · report -------------------------------------------------------------
+  const sendLine = (r) => (r.decisions || []).filter((d) => d.step === "send").map((d) => d.rationale).pop();
+
+  function renderAll() {
+    const done = results.filter((r) => !["pending", "running", "skipped"].includes(r.status));
+    $("resultsCard").hidden = !results.length;
+    const box = $("results"); box.replaceChildren();
+    for (const r of results) box.append(renderCompany(r));
+    // summary
+    const counts = {};
+    done.forEach((r) => { counts[r.status] = (counts[r.status] || 0) + 1; });
+    const fresh = done.filter((r) => !r.cached && r.seconds);
+    const tin = done.reduce((a, r) => a + ((r.usage || {}).input_tokens || 0), 0);
+    const tout = done.reduce((a, r) => a + ((r.usage || {}).output_tokens || 0), 0);
+    const costs = done.map((r) => (r.usage || {}).est_cost_usd).filter((c) => c != null);
+    const stats = $("stats"); stats.replaceChildren();
+    const stat = (big, small) => stats.append(el("div", { class: "stat" }, el("b", { text: big }), el("span", { text: small })));
+    stat(`${done.length}/${results.length}`, "companies done");
+    for (const [k, v] of Object.entries(counts)) stat(String(v), k.replace("_", " "));
+    if (fresh.length) stat(`${(fresh.reduce((a, r) => a + r.seconds, 0) / fresh.length).toFixed(0)}s`, "per company (target < 120s)");
+    if (tin) stat(`${tin + tout}`, `tokens${costs.length ? ` · ~$${costs.reduce((a, c) => a + c, 0).toFixed(4)}` : ""}`);
+    $("csvBtn").disabled = $("mdBtn").disabled = !done.length || running;
+    renderReviewStats();
+  }
+
+  function renderCompany(r) {
+    const q = r.qualification || {}, c = r.contact || {}, e = r.email || {};
+    const d = el("details", { class: "co" });
+    if (["sent", "drafted", "failed"].includes(r.status)) d.open = true;
+    const meta = [];
+    if (q.rank && !["disqualified", "failed"].includes(r.status)) meta.push(`rank ${q.rank}`);
+    if (r.cached) meta.push("cached"); else if (r.seconds) meta.push(`${r.seconds}s`);
+    d.append(el("summary", {},
+      el("span", { class: `chip ${r.status}`, text: r.status.replace("_", " ") }),
+      el("span", { class: "dom", text: r.domain }),
+      (r.company && r.company.name) ? el("span", { class: "muted small", text: r.company.name }) : null,
+      el("span", { class: "meta", text: meta.join(" · ") })));
+    if (["pending", "running", "skipped"].includes(r.status)) {
+      d.append(el("div", { class: "body" }, el("p", { class: "small muted", text: r.status === "running" ? "Working through the 7 steps…" : r.status === "skipped" ? "Not run (stopped)." : "Waiting." })));
+      return d;
+    }
+    const body = el("div", { class: "body" });
+    const sec = (title, ...kids) => body.append(el("div", { class: "sec" }, el("h3", { text: title }), ...kids));
+    const list = (items) => el("ul", {}, ...items.map((t) => el("li", { text: t })));
+    if ((q.reasons || []).length) sec("Why this company", list(q.reasons));
+    if ((q.flags || []).length) sec("Check", list(q.flags));
+    if (c.name) sec("Point of contact", el("div", { text: `${c.name} — ${c.role || "role unknown"} <${c.email || "no email"}> [${c.source}]` }),
+      c.reason ? el("div", { class: "small muted", text: "because " + c.reason }) : null);
+    if ((e.pains || []).length) sec("Two pain points", list(e.pains));
+    if (e.subject) sec("Email", el("div", { class: "small muted", text: "Hook: " + (e.hook || "") }),
+      el("pre", { class: "mail", text: `Subject: ${e.subject}\n\n${e.body}` }));
+    const s = sendLine(r);
+    if (s) sec("Send", el("div", { class: /failed|refused/i.test(s) ? "err" : "", text: s }));
+    if (r.error) sec("Error", el("div", { class: "err", text: r.error }));
+    if ((r.decisions || []).length) {
+      const dl = el("details", {}, el("summary", { class: "small", text: `Decision log (${r.decisions.length} steps)` }),
+        el("div", { class: "log", text: r.decisions.map((x) => `[${x.step}] ${x.rationale}`).join("\n") }));
+      body.append(el("div", { class: "sec" }, dl));
+    }
+    if (e.subject || c.name) body.append(renderReview(r));
+    d.append(body);
+    return d;
+  }
+
+  // ---- 5 · review -------------------------------------------------------------
+  function renderReview(r) {
+    const cur = reviews[r.domain] || {};
+    const sel = (opts, val, onch, label) => {
+      const s = el("select", { "aria-label": label }, ...opts.map(([v, t]) => { const o = el("option", { value: v, text: t }); if (v === val) o.selected = true; return o; }));
+      s.addEventListener("change", () => onch(s.value)); return s;
+    };
+    const set = (k, v) => { reviews[r.domain] = { ...(reviews[r.domain] || {}), [k]: v }; persist(); renderReviewStats(); };
+    const notes = el("input", { type: "text", placeholder: "Review notes (optional)", "aria-label": "Review notes" });
+    notes.value = cur.review_notes || "";
+    notes.addEventListener("change", () => set("review_notes", notes.value));
+    return el("div", { class: "review" },
+      el("label", { text: "Draft:" }),
+      sel([["", "not reviewed"], ["approved", "approved as is"], ["edited", "edited"], ["rejected", "rejected"]], cur.review_outcome || "", (v) => set("review_outcome", v), "Draft outcome"),
+      el("label", { text: "Right person?" }),
+      sel([["", "not checked"], ["y", "yes"], ["n", "no"]], cur.poc_correct || "", (v) => set("poc_correct", v), "Contact correct"),
+      notes);
+  }
+
+  function renderReviewStats() {
+    const vals = Object.values(reviews);
+    const reviewed = vals.filter((v) => ["approved", "edited", "rejected"].includes(v.review_outcome));
+    const rewritten = reviewed.filter((v) => v.review_outcome !== "approved").length;
+    const poc = vals.filter((v) => v.poc_correct === "y" || v.poc_correct === "n");
+    const box = $("reviewStats"); box.replaceChildren();
+    const stat = (big, small) => box.append(el("div", { class: "stat" }, el("b", { text: big }), el("span", { text: small })));
+    stat(reviewed.length ? `${Math.round((rewritten / reviewed.length) * 100)}%` : "—", `rewrite rate (${reviewed.length} reviewed)`);
+    stat(poc.length ? `${Math.round((poc.filter((v) => v.poc_correct === "y").length / poc.length) * 100)}%` : "—", `PoC accuracy (${poc.length} checked)`);
+  }
+
+  // ---- export -----------------------------------------------------------------
+  async function download(kind) {
+    const btn = kind === "csv" ? $("csvBtn") : $("mdBtn");
+    btn.disabled = true;
+    try {
+      const done = results.filter((r) => !["pending", "running", "skipped"].includes(r.status));
+      const out = await api("export", { results: done, reviews });
+      const stamp = new Date().toISOString().slice(0, 16).replace(/[-:T]/g, "");
+      const blob = new Blob([kind === "csv" ? out.csv : out.markdown], { type: kind === "csv" ? "text/csv" : "text/markdown" });
+      const a = el("a", { href: URL.createObjectURL(blob), download: `campaign-${stamp}.${kind === "csv" ? "csv" : "md"}` });
+      document.body.append(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+    } catch (e) { alert(e.message); }
+    finally { btn.disabled = false; }
+  }
+  $("csvBtn").addEventListener("click", () => download("csv"));
+  $("mdBtn").addEventListener("click", () => download("md"));
+
+  // ---- start ------------------------------------------------------------------
+  // try silently: the saved password, or none at all on a local run without one
+  unlock(true);
+})();
+</script>
+</body>
+</html>

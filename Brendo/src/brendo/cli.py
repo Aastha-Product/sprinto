@@ -7,6 +7,7 @@
   python -m brendo.cli --export                  # campaign record for the latest run
   python -m brendo.cli --review out/campaign-<run>.csv   # import review outcomes
   python -m brendo.cli --purge acme.example      # delete everything stored for a domain
+  python -m brendo.cli --web                     # the website at http://localhost:8000
 """
 from __future__ import annotations
 
@@ -96,7 +97,14 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--review", type=Path, metavar="CSV",
                     help="import review outcomes from a filled-in campaign CSV")
     ap.add_argument("--purge", metavar="DOMAIN", help="delete everything stored for a domain")
+    ap.add_argument("--web", nargs="?", const=8000, type=int, metavar="PORT",
+                    help="open the Brendo website on this PC (default http://localhost:8000)")
     args = ap.parse_args(argv)
+
+    if args.web:
+        from .web import serve
+        serve(args.web)
+        return 0
 
     settings = get_settings()
 

@@ -12,6 +12,7 @@ outcomes and prints the two numbers the kill criterion needs: rewrite rate and P
 from __future__ import annotations
 
 import csv
+import io
 from pathlib import Path
 
 from .store import Store
@@ -64,18 +65,22 @@ def row_for(d: dict) -> dict:
     }
 
 
-def export(store: Store, run_id: str, out_dir: Path) -> tuple[Path, Path]:
-    results = store.results_for_run(run_id)
-    out_dir.mkdir(parents=True, exist_ok=True)
-    csv_path = out_dir / f"campaign-{run_id}.csv"
-    md_path = out_dir / f"campaign-{run_id}.md"
+def render(results: list[dict], reviews: dict[str, dict] | None = None,
+           title: str = "Campaign record") -> tuple[str, str]:
+    """The campaign record as (CSV text, Markdown text). `reviews` optionally fills the
+    review columns: {domain: {"review_outcome", "poc_correct", "review_notes"}}."""
     rows = [row_for(d) for d in results]
-    with csv_path.open("w", newline="", encoding="utf-8") as fh:
-        w = csv.DictWriter(fh, fieldnames=COLUMNS)
-        w.writeheader()
-        w.writerows(rows)
+    for r in rows:
+        given = (reviews or {}).get(r["domain"]) or {}
+        for col in ("review_outcome", "poc_correct", "review_notes"):
+            if given.get(col):
+                r[col] = str(given[col])
+    buf = io.StringIO(newline="")
+    w = csv.DictWriter(buf, fieldnames=COLUMNS)
+    w.writeheader()
+    w.writerows(rows)
 
-    md = [f"# Campaign record --- run {run_id}", ""]
+    md = [f"# {title}", ""]
     order = {"sent": 0, "drafted": 0, "qualified": 1, "qualified_flagged": 2, "flagged": 3,
              "failed": 4, "disqualified": 5}
     rank_order = {"high": 0, "normal": 1, "lower": 2, "": 3}
@@ -99,7 +104,16 @@ def export(store: Store, run_id: str, out_dir: Path) -> tuple[Path, Path]:
                 md.append(f"> {line}")
         md.append(f"- **Next step:** {r['next_step']}")
         md.append("")
-    md_path.write_text("\n".join(md), encoding="utf-8")
+    return buf.getvalue(), "\n".join(md)
+
+
+def export(store: Store, run_id: str, out_dir: Path) -> tuple[Path, Path]:
+    out_dir.mkdir(parents=True, exist_ok=True)
+    csv_path = out_dir / f"campaign-{run_id}.csv"
+    md_path = out_dir / f"campaign-{run_id}.md"
+    csv_text, md_text = render(store.results_for_run(run_id), title=f"Campaign record --- run {run_id}")
+    csv_path.write_text(csv_text, encoding="utf-8", newline="")
+    md_path.write_text(md_text, encoding="utf-8")
     return csv_path, md_path
 
 
