@@ -29,3 +29,15 @@ def test_app_password_spaces_are_ignored(monkeypatch):
     monkeypatch.setattr(config, "load_dotenv", lambda *a, **k: None)
     monkeypatch.setenv("GMAIL_APP_PASSWORD", "abcd efgh ijkl mnop")
     assert config.get_settings().gmail_app_password == "abcdefghijklmnop"
+
+
+def test_env_names_are_case_insensitive(monkeypatch):
+    from brendo import config
+    monkeypatch.setattr(config, "load_dotenv", lambda *a, **k: None)
+    for k in ("GEMINI_API_KEY", "GOOGLE_API_KEY", "BRENDO_SEND_TO"):
+        monkeypatch.delenv(k, raising=False)
+    monkeypatch.setenv("Gemini_API_KEY", " AQ.test ")
+    monkeypatch.setenv("brendo_send_to", "me@gmail.com")
+    s = config.get_settings()
+    assert s.gemini_api_key == "AQ.test" and s.provider == "gemini"
+    assert s.send_to == "me@gmail.com"

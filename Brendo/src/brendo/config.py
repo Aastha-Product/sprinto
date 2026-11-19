@@ -135,7 +135,17 @@ def redact(text: str, settings: "Settings | None" = None) -> str:
 
 def get_settings() -> Settings:
     load_dotenv()
-    e = os.environ.get
+    # Names are matched case-insensitively and trimmed: on Vercel (Linux) "Gemini_API_KEY"
+    # and "GEMINI_API_KEY" are different variables, and a mis-cased name silently meant mock.
+    folded: dict[str, str] = {}
+    for k, v in os.environ.items():
+        folded.setdefault(k.strip().upper(), v)
+
+    def e(name: str, default: str = "") -> str:
+        v = os.environ.get(name)
+        if v is None:
+            v = folded.get(name.upper())
+        return default if v is None else v.strip()
     s = Settings(
         anthropic_api_key=e("ANTHROPIC_API_KEY", ""),
         llm_model=e("BRENDO_LLM_MODEL", "claude-haiku-5-5"),
