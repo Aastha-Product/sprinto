@@ -48,7 +48,7 @@ button:disabled{opacity:.5;cursor:not-allowed}
   padding:5px 8px;border-radius:999px;background:var(--surface-2);color:var(--muted);white-space:nowrap}
 .chip.sent{background:color-mix(in srgb,var(--ok) 18%,var(--bg));color:var(--ok)}
 .chip.drafted,.chip.qualified,.chip.qualified_flagged{background:var(--accent-weak);color:var(--accent-fg)}
-.chip.flagged,.chip.running{background:color-mix(in srgb,var(--warn) 18%,var(--bg));color:var(--warn)}
+.chip.flagged,.chip.escalated,.chip.running{background:color-mix(in srgb,var(--warn) 18%,var(--bg));color:var(--warn)}
 .chip.failed{background:color-mix(in srgb,var(--crit) 15%,var(--bg));color:var(--crit)}
 .chip.disqualified{background:var(--surface-2);color:var(--muted)}
 .progress{height:6px;background:var(--surface-2);border-radius:99px;overflow:hidden;margin:12px 0 4px}
@@ -74,6 +74,13 @@ pre.mail{white-space:pre-wrap;word-break:break-word;font:13px/1.55 var(--sans);b
 .stat span{font-size:12px;color:var(--muted)}
 .banner{border-left:3px solid var(--accent);background:var(--accent-weak);padding:10px 12px;border-radius:0 8px 8px 0;font-size:13.5px;margin:10px 0 0}
 .banner.bad{border-left-color:var(--crit);background:color-mix(in srgb,var(--crit) 12%,var(--bg))}
+.editor input[type=text]{width:100%;margin:4px 0 6px;font-weight:600}
+.editor textarea{min-height:190px;font:13px/1.55 var(--sans)}
+.edit-msg{font-size:13px;margin-top:6px}
+.mem{list-style:none;padding:0;margin:8px 0 0}
+.mem li{border:1px solid var(--border);border-radius:9px;padding:9px 12px;margin:0 0 8px;background:var(--bg);display:flex;gap:10px;align-items:flex-start}
+.mem li div{flex:1;min-width:0}
+.mem .meta{font-size:12px;color:var(--muted)}
 [hidden]{display:none!important}
 </style>
 </head>
@@ -140,6 +147,18 @@ dub.co</textarea>
       <div class="stats" id="reviewStats"></div>
     </div>
   </section>
+
+  <section class="card" id="memCard" hidden>
+    <div class="row" style="justify-content:space-between">
+      <h2 style="margin:0">6 · What Brendo has learned from your edits</h2>
+      <div class="row">
+        <button class="ghost" id="memExport">Download memory</button>
+        <label class="ghost small" style="cursor:pointer"><input type="file" id="memImport" accept="application/json" hidden><span style="color:var(--accent-fg);font-weight:600">Import memory</span></label>
+      </div>
+    </div>
+    <p class="small muted" style="margin:6px 0 0">When you edit a draft and click <b>Save my edit</b>, Brendo judges whether it was a real correction (a new hook, a tone change) or just a typo. Real corrections are kept here, in this browser, and applied to future drafts where they fit; on the same topic the newest wins. Download the memory to keep it safe or move it to another browser.</p>
+    <ul class="mem" id="memList"></ul>
+  </section>
 </div>
 
 <script>
@@ -153,6 +172,7 @@ dub.co</textarea>
   let password = store.get("brendo.pw", true) || "";
   let results = store.get("brendo.results") || [];
   let reviews = store.get("brendo.reviews") || {};
+  let memory = store.get("brendo.memory") || [];
   // a run interrupted by closing the tab must not look as if it is still going
   results.forEach((r) => { if (r.status === "running" || r.status === "pending") r.status = "skipped"; });
   let stopping = false, running = false;
@@ -199,6 +219,7 @@ dub.co</textarea>
       store.set("brendo.pw", password, true);
       $("lockCard").hidden = true;
       $("checkCard").hidden = $("runCard").hidden = false;
+      renderMemory();
       showCheck(r);
       renderAll();
     } catch (e) {
@@ -256,7 +277,7 @@ dub.co</textarea>
       $("prog").firstElementChild.style.width = `${(i / domains.length) * 100}%`;
       renderAll();
       try {
-        results[i] = await api("run", { domain: domains[i], offline, force });
+        results[i] = await api("run", { domain: domains[i], offline, force, corrections: memory });
       } catch (e) {
         if (e.status === 401 || e.status === 503) { results[i] = { domain: domains[i], status: "failed", error: e.message }; stopping = true; }
         else results[i] = { domain: domains[i], status: "failed", error: e.message, decisions: [] };
@@ -269,7 +290,7 @@ dub.co</textarea>
     renderAll();
   });
 
-  function persist() { store.set("brendo.results", results); store.set("brendo.reviews", reviews); }
+  function persist() { store.set("brendo.results", results); store.set("brendo.reviews", reviews); store.set("brendo.memory", memory); }
 
   // ---- 4 · report -------------------------------------------------------------
   const sendLine = (r) => (r.decisions || []).filter((d) => d.step === "send").map((d) => d.rationale).pop();
@@ -320,8 +341,9 @@ dub.co</textarea>
     if (c.name) sec("Point of contact", el("div", { text: `${c.name} — ${c.role || "role unknown"} <${c.email || "no email"}> [${c.source}]` }),
       c.reason ? el("div", { class: "small muted", text: "because " + c.reason }) : null);
     if ((e.pains || []).length) sec("Two pain points", list(e.pains));
-    if (e.subject) sec("Email", el("div", { class: "small muted", text: "Hook: " + (e.hook || "") }),
-      el("pre", { class: "mail", text: `Subject: ${e.subject}\n\n${e.body}` }));
+    if (e.subject) sec("Email — edit it here if you like", el("div", { class: "small muted", text: "Hook: " + (e.hook || "") }),
+      (e.applied_corrections || []).length ? el("div", { class: "small muted", text: `Used ${e.applied_corrections.length} of your past corrections: ` + e.applied_corrections.map((id) => (memory.find((m) => m.id === id) || {}).lesson || id).join(" · ") }) : null,
+      renderEditor(r));
     const s = sendLine(r);
     if (s) sec("Send", el("div", { class: /failed|refused/i.test(s) ? "err" : "", text: s }));
     if (r.error) sec("Error", el("div", { class: "err", text: r.error }));
@@ -334,6 +356,72 @@ dub.co</textarea>
     d.append(body);
     return d;
   }
+
+  // ---- editing + feedback memory ---------------------------------------------
+  function renderEditor(r) {
+    const e = r.email, key = r.domain;
+    const subj = el("input", { type: "text", "aria-label": "Subject" });
+    const body = el("textarea", { "aria-label": "Email body", spellcheck: "true" });
+    subj.value = e.edited_subject ?? e.subject; body.value = e.edited_body ?? e.body;
+    const msg = el("div", { class: "edit-msg muted" });
+    const save = el("button", { class: "ghost", text: "Save my edit" });
+    const send = el("button", { class: "ghost", text: "Send this version to my inbox" });
+    const keep = () => { e.edited_subject = subj.value; e.edited_body = body.value; persist(); };
+    subj.addEventListener("change", keep); body.addEventListener("change", keep);
+    save.addEventListener("click", async () => {
+      keep(); save.disabled = true; msg.className = "edit-msg muted"; msg.textContent = "Judging the edit…";
+      try {
+        const v = await api("edit", { before: { subject: e.subject, body: e.body }, after: { subject: subj.value, body: body.value } });
+        if (v.meaningful && v.correction) {
+          memory = [v.correction, ...memory.filter((m) => m.id !== v.correction.id)];
+          reviews[key] = { ...(reviews[key] || {}), review_outcome: "edited" };
+          persist(); renderMemory(); renderReviewStats();
+          msg.className = "edit-msg"; msg.textContent = `Learned (${v.correction.topic}): ${v.correction.lesson}`;
+        } else {
+          msg.textContent = "Not stored as a correction: " + (v.reason || "no real change");
+        }
+      } catch (err) { msg.className = "edit-msg err"; msg.textContent = err.message; }
+      finally { save.disabled = false; }
+    });
+    send.addEventListener("click", async () => {
+      keep(); send.disabled = true; msg.className = "edit-msg muted"; msg.textContent = "Sending…";
+      try {
+        const v = await api("send", { domain: key, subject: subj.value, body: body.value, footer: e.footer || "" });
+        msg.className = v.sent ? "edit-msg" : (/failed|refused/i.test(v.send) ? "edit-msg err" : "edit-msg muted");
+        msg.textContent = v.send || (v.sent ? "Sent." : "Not sent.");
+      } catch (err) { msg.className = "edit-msg err"; msg.textContent = err.message; }
+      finally { send.disabled = false; }
+    });
+    return el("div", { class: "editor" }, subj, body, el("div", { class: "row", style: "margin-top:8px" }, save, send), msg);
+  }
+
+  function renderMemory() {
+    $("memCard").hidden = !memory.length && $("runCard").hidden;
+    const list = $("memList"); list.replaceChildren();
+    if (!memory.length) { list.append(el("li", {}, el("div", { class: "small muted", text: "Nothing yet. Edit a draft and click Save my edit." }))); return; }
+    for (const m of memory) {
+      const rm = el("button", { class: "ghost small", text: "Remove" });
+      rm.addEventListener("click", () => { memory = memory.filter((x) => x.id !== m.id); persist(); renderMemory(); });
+      const meta = [m.topic, m.scope === "specific" && m.context ? `only for ${m.context}` : "all prospects",
+        m.requires_fact ? `needs ${m.requires_fact}` : null, (m.created_at || "").slice(0, 10)].filter(Boolean).join(" · ");
+      list.append(el("li", {}, el("div", {}, el("div", { text: m.lesson }), el("div", { class: "meta", text: meta })), rm));
+    }
+  }
+  $("memExport").addEventListener("click", () => {
+    const a = el("a", { href: URL.createObjectURL(new Blob([JSON.stringify(memory, null, 2)], { type: "application/json" })), download: "brendo-memory.json" });
+    document.body.append(a); a.click(); a.remove();
+  });
+  $("memImport").addEventListener("change", async (ev) => {
+    const f = ev.target.files && ev.target.files[0]; if (!f) return;
+    try {
+      const data = JSON.parse(await f.text());
+      if (!Array.isArray(data)) throw new Error("not a list");
+      const ids = new Set(memory.map((m) => m.id));
+      memory = [...data.filter((m) => m && m.id && m.lesson && !ids.has(m.id)), ...memory];
+      persist(); renderMemory();
+    } catch (err) { alert("That file isn't a Brendo memory file: " + err.message); }
+    ev.target.value = "";
+  });
 
   // ---- 5 · review -------------------------------------------------------------
   function renderReview(r) {

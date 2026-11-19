@@ -18,7 +18,7 @@ def server(settings, monkeypatch):
     monkeypatch.setattr(web, "get_settings", lambda: settings)
     monkeypatch.setenv("BRENDO_WEB_PASSWORD", "s3cret")
     servers = {}
-    for action in ("check", "run", "export"):
+    for action in ("check", "run", "export", "edit", "send"):
         srv = ThreadingHTTPServer(("127.0.0.1", 0), web.make_handler(action))
         threading.Thread(target=srv.serve_forever, daemon=True).start()
         servers[action] = srv
@@ -162,3 +162,45 @@ def test_responses_never_carry_a_secret(server, monkeypatch):
     assert status == 500
     assert "AIzaFAKEKEY123456" not in out["error"] and "s3cret" not in out["error"]
     assert "[hidden]" in out["error"]
+
+
+FIXTURE = {
+    "pages": {"/": "Ledgerly — finance automation\n"
+                   "Ledgerly is the SaaS platform built for B2B companies to automate finance ops.\n"
+                   "We raised our Series B in 2026 and have 12 open roles.\n"
+                   "We are a team of 120 people.\n"
+                   "We're hiring a Compliance Manager to lead our audit work.\n"
+                   "Our enterprise plan is used by enterprise customers."},
+    "contact": {"name": "Priya Shah", "role": "Head of Security", "email": "priya@ledgerly.com"},
+}
+
+
+def test_fixture_run_drafts_without_fetching_or_sending(server):
+    status, out = call(server, "run", {"domain": "ledgerly.com", "fixture": FIXTURE})
+    assert status == 200, out
+    assert out["status"] == "drafted" and out["fixture"] is True
+    assert out["email"]["body"].startswith("Hi Priya")
+    assert any("draft only" in d["rationale"] for d in out["decisions"])
+
+
+def test_fixture_run_applies_relevant_corrections(server):
+    corr = [{"id": "c1", "lesson": "Mention their funding round", "topic": "hook",
+             "requires_fact": "funding_stage", "created_at": "2026-11-01"}]
+    _, out = call(server, "run", {"domain": "ledgerly.com", "fixture": FIXTURE, "corrections": corr})
+    assert out["email"]["applied_corrections"] == ["c1"]
+
+
+def test_edit_endpoint_judges_meaningfulness(server):
+    before = {"subject": "Hi", "body": "Hi Priya,\n\nWorth a look?"}
+    _, typo = call(server, "edit", {"before": before, "after": {"subject": "Hi", "body": "Hi Priya,\n\nWorht a look?"}})
+    assert typo["meaningful"] is False
+    _, tone = call(server, "edit", {"before": before, "after": {"subject": "Hi", "body": "Hi Priya,\n\nWorth a look!"}})
+    assert tone["meaningful"] is True and tone["correction"]["topic"] == "tone"
+
+
+def test_send_goes_only_to_the_configured_recipient(server):
+    status, out = call(server, "send", {"domain": "ledgerly.com", "subject": "Hi", "body": "Hi Priya,\n\nHello.",
+                                        "to": "someone-else@example.org"})
+    assert status == 200
+    assert out["drafted"] is True and "me@mydomain.test" in out["send"]
+    assert "someone-else" not in out["send"]

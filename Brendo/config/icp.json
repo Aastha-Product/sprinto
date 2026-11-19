@@ -1,5 +1,5 @@
 {
-  "_comment": "Sprinto ICP as the Evidence Map (deck slide 40). Drives extraction, the loop and qualification. Edit thresholds here, not in code.",
+  "_comment": "Sprinto ICP as the Evidence Map (L4 deck) plus the Evals deck's shortlist rules (Series A-C only, soft 50-200 headcount band). Drives extraction, the loop and qualification. Edit thresholds here, not in code.",
   "max_fetches_beyond_homepage": 4,
   "questions": [
     {
@@ -25,7 +25,8 @@
         "iso 27001",
         "iso27001",
         "compliance"
-      ]
+      ],
+      "required": true
     },
     {
       "id": "is_b2b_saas",
@@ -42,7 +43,8 @@
       "limit": 1,
       "if_unanswered": "manual_review",
       "short_circuit": "disqualify_if_false",
-      "link_keywords": []
+      "link_keywords": [],
+      "required": true
     },
     {
       "id": "right_stage",
@@ -59,7 +61,7 @@
       ],
       "sufficient": "funding stage named, OR 5+ open roles, OR enterprise pricing tier",
       "limit": 2,
-      "if_unanswered": "qualify at lower rank, flagged",
+      "if_unanswered": "qualify at lower rank, flagged (if the fetch cap stops the loop first: escalated)",
       "short_circuit": "none",
       "link_keywords": [
         "careers",
@@ -68,13 +70,34 @@
         "we're hiring",
         "open roles",
         "work with us"
+      ],
+      "required": true
+    },
+    {
+      "id": "right_size",
+      "label": "Right size?",
+      "fields": [
+        "employee_count"
+      ],
+      "sources": [
+        "/about",
+        "/company"
+      ],
+      "sufficient": "a stated headcount",
+      "limit": 1,
+      "required": false,
+      "if_unanswered": "no effect on the verdict; flagged 'size unknown'",
+      "short_circuit": "disqualify_if_far_outside_band",
+      "link_keywords": [
+        "about",
+        "company",
+        "team"
       ]
     }
   ],
   "stage_thresholds": {
     "min_open_roles": 5
   },
-  "_ranking_comment": "Ranking signals from the brief's ICP ('typically Series A-C', 'preparing for an audit or under pressure from enterprise customers'). They set the rank and feed the hook; they never gate qualification.",
   "ranking": {
     "target_stages": [
       "series a",
@@ -107,7 +130,8 @@
       "bootstrapped",
       "self-funded",
       "profitable"
-    ]
+    ],
+    "_comment": "Stage now gates (Series A-C only); compliance pressure still lifts a qualified company to rank 'high'."
   },
   "_personas_comment": "Who Sprinto sells to, best first. PoC choice takes the lowest-rank persona whose keywords match the title; ties go to Hunter's confidence. No match = no contact (flagged), never 'nearest manager'.",
   "personas": [
@@ -173,5 +197,16 @@
     "instagram.com",
     "producthunt.com",
     "news.ycombinator.com"
-  ]
+  ],
+  "_funding_comment": "Evals deck, Decision 1: funding stage must be Series A, B or C. Seed, Series D+ and 'bootstrapped/profitable' are rejected. A funding mention older than max_age_years is stale and counts as unknown (Decision 2: recency).",
+  "funding": {
+    "max_age_years": 2
+  },
+  "_size_comment": "Evals deck, Decision 1: target 50-200 employees, a SOFT band. near_low..near_high is 'moderately outside, still acceptable' (accepted, noted, flagged); beyond that is far outside and rejected. Unknown size never rejects.",
+  "size_band": {
+    "min": 50,
+    "max": 200,
+    "near_low": 35,
+    "near_high": 350
+  }
 }

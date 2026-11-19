@@ -1,0 +1,223 @@
+{
+  "decision": "D4 & D5 · Feedback loop: what counts as a correction, and what applies?",
+  "partitions": "D4 relevance: same context / different context / generic; conflict: none / with a newer correction. D5: rewrite / typo / punctuation that changes tone.",
+  "cases": [
+    {
+      "id": "D4-01",
+      "title": "Past correction 'mention their funding round'; prospect has a recent round",
+      "severity": "Low",
+      "kind": "run",
+      "expected": "Applied",
+      "input": {
+        "domain": "ledgerly.test",
+        "fixture": {
+          "pages": {
+            "/": "Ledgerly — finance automation\nLedgerly is the SaaS platform built for B2B companies to automate their finance operations.\nOur enterprise plan is used by enterprise customers worldwide.\nWe raised our Series B in 2026 and have 12 open roles.\nWe are a team of 120 people.\nWe're hiring a Compliance Manager to lead our first audit."
+          },
+          "contact": {
+            "name": "Priya Shah",
+            "role": "Head of Security",
+            "email": "priya@ledgerly.test"
+          }
+        },
+        "corrections": [
+          {
+            "id": "c_fund",
+            "lesson": "Mention the prospect's latest funding round in the opening line",
+            "topic": "hook",
+            "requires_fact": "funding_stage",
+            "scope": "generic",
+            "context": null,
+            "created_at": "2026-11-10T10:00:00+00:00"
+          }
+        ]
+      },
+      "hard": [
+        {
+          "path": "email.applied_corrections",
+          "contains": "c_fund"
+        }
+      ],
+      "judge": [
+        "The decision log says the funding-round correction was applied"
+      ]
+    },
+    {
+      "id": "D4-02",
+      "title": "Tone fix written for an unrelated industry",
+      "severity": "High",
+      "kind": "run",
+      "expected": "Not applied: irrelevant to this prospect",
+      "input": {
+        "domain": "ledgerly.test",
+        "fixture": {
+          "pages": {
+            "/": "Ledgerly — finance automation\nLedgerly is the SaaS platform built for B2B companies to automate their finance operations.\nOur enterprise plan is used by enterprise customers worldwide.\nWe raised our Series B in 2026 and have 12 open roles.\nWe are a team of 120 people.\nWe're hiring a Compliance Manager to lead our first audit."
+          },
+          "contact": {
+            "name": "Priya Shah",
+            "role": "Head of Security",
+            "email": "priya@ledgerly.test"
+          }
+        },
+        "corrections": [
+          {
+            "id": "c_health",
+            "lesson": "Use a gentler, more formal tone for hospital buyers",
+            "topic": "tone",
+            "requires_fact": null,
+            "scope": "specific",
+            "context": "healthcare hospitals",
+            "created_at": "2026-11-11T10:00:00+00:00"
+          }
+        ]
+      },
+      "hard": [
+        {
+          "path": "email.applied_corrections",
+          "not_contains": "c_health"
+        },
+        {
+          "path": "decisions",
+          "contains": "not applying c_health"
+        }
+      ]
+    },
+    {
+      "id": "D4-03",
+      "title": "Older correction contradicts a newer one on the same topic",
+      "severity": "Critical",
+      "kind": "run",
+      "expected": "Most recent wins, not both or neither",
+      "input": {
+        "domain": "ledgerly.test",
+        "fixture": {
+          "pages": {
+            "/": "Ledgerly — finance automation\nLedgerly is the SaaS platform built for B2B companies to automate their finance operations.\nOur enterprise plan is used by enterprise customers worldwide.\nWe raised our Series B in 2026 and have 12 open roles.\nWe are a team of 120 people.\nWe're hiring a Compliance Manager to lead our first audit."
+          },
+          "contact": {
+            "name": "Priya Shah",
+            "role": "Head of Security",
+            "email": "priya@ledgerly.test"
+          }
+        },
+        "corrections": [
+          {
+            "id": "c_old",
+            "lesson": "Use exclamation marks to sound energetic",
+            "topic": "tone",
+            "requires_fact": null,
+            "scope": "generic",
+            "context": null,
+            "created_at": "2026-10-01T10:00:00+00:00"
+          },
+          {
+            "id": "c_new",
+            "lesson": "No exclamation marks; keep a calm tone",
+            "topic": "tone",
+            "requires_fact": null,
+            "scope": "generic",
+            "context": null,
+            "created_at": "2026-11-15T10:00:00+00:00"
+          }
+        ]
+      },
+      "hard": [
+        {
+          "path": "email.applied_corrections",
+          "contains": "c_new"
+        },
+        {
+          "path": "email.applied_corrections",
+          "not_contains": "c_old"
+        },
+        {
+          "path": "decisions",
+          "contains": "most recent wins"
+        }
+      ],
+      "judge": [
+        "The output identifies that the two corrections conflict",
+        "It picks the more recent correction",
+        "Its stated reason names which correction it chose and why"
+      ]
+    },
+    {
+      "id": "D5-01",
+      "title": "Human rewrites the entire opening hook",
+      "severity": "Low",
+      "kind": "edit",
+      "expected": "Stored as a correction",
+      "input": {
+        "before": {
+          "subject": "Ledgerly: SOC 2 before the next enterprise deal",
+          "body": "Hi Priya,\n\nI saw you're hiring a Compliance Manager. That usually means audit work lands before the team exists.\n\nSprinto automates SOC 2 and ISO 27001 for SaaS teams.\n\nWorth a 15-minute look?\n\nBest,\nThe Sprinto team"
+        },
+        "after": {
+          "subject": "Ledgerly: SOC 2 before the next enterprise deal",
+          "body": "Hi Priya,\n\nCongrats on the Series B. New enterprise deals usually bring security reviews with them.\n\nSprinto automates SOC 2 and ISO 27001 for SaaS teams.\n\nWorth a 15-minute look?\n\nBest,\nThe Sprinto team"
+        }
+      },
+      "hard": [
+        {
+          "path": "meaningful",
+          "equals": true
+        },
+        {
+          "path": "correction.lesson",
+          "exists": true
+        }
+      ]
+    },
+    {
+      "id": "D5-02",
+      "title": "Human fixes one typo",
+      "severity": "Low",
+      "kind": "edit",
+      "expected": "Not stored",
+      "input": {
+        "before": {
+          "subject": "Ledgerly: SOC 2 before the next enterprise deal",
+          "body": "Hi Priya,\n\nI saw you're hiring a Compliance Manager. That usually means audit work lands before the team exists.\n\nSprinto automates SOC 2 and ISO 27001 for SaaS teams.\n\nWorth a 15-minute look?\n\nBest,\nThe Sprinto team"
+        },
+        "after": {
+          "subject": "Ledgerly: SOC 2 before the next enterprise deal",
+          "body": "Hi Priya,\n\nI saw you're hiring a Compliance Manager. That usualy means audit work lands before the team exists.\n\nSprinto automates SOC 2 and ISO 27001 for SaaS teams.\n\nWorth a 15-minute look?\n\nBest,\nThe Sprinto team"
+        }
+      },
+      "hard": [
+        {
+          "path": "meaningful",
+          "equals": false
+        }
+      ]
+    },
+    {
+      "id": "D5-03",
+      "title": "Punctuation only, but it changes the tone ('?' to '!')",
+      "severity": "High",
+      "kind": "edit",
+      "expected": "Judged on intent, not edit size",
+      "input": {
+        "before": {
+          "subject": "Ledgerly: SOC 2 before the next enterprise deal",
+          "body": "Hi Priya,\n\nI saw you're hiring a Compliance Manager. That usually means audit work lands before the team exists.\n\nSprinto automates SOC 2 and ISO 27001 for SaaS teams.\n\nWorth a 15-minute look?\n\nBest,\nThe Sprinto team"
+        },
+        "after": {
+          "subject": "Ledgerly: SOC 2 before the next enterprise deal",
+          "body": "Hi Priya,\n\nI saw you're hiring a Compliance Manager. That usually means audit work lands before the team exists.\n\nSprinto automates SOC 2 and ISO 27001 for SaaS teams.\n\nWorth a 15-minute look!\n\nBest,\nThe Sprinto team"
+        }
+      },
+      "hard": [
+        {
+          "path": "meaningful",
+          "equals": true
+        }
+      ],
+      "judge": [
+        "It does not treat the edit as noise because it is small",
+        "It flags the edit as meaningful because the tone changed"
+      ]
+    }
+  ]
+}

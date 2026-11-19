@@ -21,8 +21,9 @@ _BOILERPLATE = re.compile(
     re.IGNORECASE,
 )
 _SIGNAL = re.compile(
-    r"(soc ?2|iso ?27001|gdpr|hipaa|pci|series [a-e]|seed|open roles?|enterprise|"
-    r"saas|compliance|funding|raised|security|audit|grc|ciso|questionnaire)",
+    r"(soc ?2|iso ?27001|gdpr|hipaa|pci|series [a-h]|seed|open roles?|enterprise|"
+    r"saas|compliance|funding|raised|security|audit|grc|ciso|questionnaire|"
+    r"\d[\d,]*\+?\s*(?:employees|people|team members|staff)|team of \d)",
     re.IGNORECASE,
 )
 _DROP_TAGS = {"script", "style", "nav", "footer", "form", "aside", "noscript", "svg"}

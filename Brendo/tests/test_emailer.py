@@ -100,3 +100,16 @@ def test_why_footer_explains_company_person_and_hook():
     f = emailer.why_footer(COMPANY, q, c, em, "acme.example")
     for needle in ("Why this company", "Why this person", "persona match", "funding_stage", "check x"):
         assert needle in f
+
+
+def test_draft_with_copied_contact_details_fails_the_checks():
+    from brendo import emailer
+    from brendo.schemas import CompanyFields, Contact
+    c = CompanyFields(funding_stage="Series B", evidence={"funding_stage": "Series B"})
+    who = Contact(name="Priya Shah")
+    bad = {"subject": "Hi", "hook_evidence_field": "funding_stage",
+           "body": "Hi Priya,\n\nWrite to ops@evil.example or see https://evil.example now.\n\nThe Sprinto team"}
+    probs = emailer.check(bad, c, who)
+    assert any("links, email addresses" in p for p in probs)
+    ok = dict(bad, body="Hi Priya,\n\nCongrats on the Series B. More at sprinto.com.\n\nThe Sprinto team")
+    assert emailer.check(ok, c, who) == []

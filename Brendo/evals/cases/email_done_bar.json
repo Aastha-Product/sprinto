@@ -1,0 +1,98 @@
+{
+  "decision": "Email · the brief's 'done' bar",
+  "partitions": "Contact named / no usable contact. Hook grounded in a fact.",
+  "cases": [
+    {
+      "id": "E-01",
+      "title": "Qualified company with a named contact",
+      "severity": "Critical",
+      "kind": "run",
+      "expected": "Drafted to Priya by first name",
+      "input": {
+        "domain": "ledgerly.test",
+        "fixture": {
+          "pages": {
+            "/": "Ledgerly — finance automation\nLedgerly is the SaaS platform built for B2B companies to automate their finance operations.\nOur enterprise plan is used by enterprise customers worldwide.\nWe raised our Series B in 2026 and have 12 open roles.\nWe are a team of 120 people.\nWe're hiring a Compliance Manager to lead our first audit."
+          },
+          "contact": {
+            "name": "Priya Shah",
+            "role": "Head of Security",
+            "email": "priya@ledgerly.test"
+          }
+        }
+      },
+      "hard": [
+        {
+          "path": "status",
+          "equals": "drafted"
+        },
+        {
+          "path": "email.body",
+          "matches": "^\\s*(Hi|Hello|Hey|Dear) Priya\\b"
+        }
+      ],
+      "judge": [
+        "The email opens with one specific hook taken from the company's own facts",
+        "A Head of Security would plausibly reply; it is not generic",
+        "It makes no claim about the company that the facts don't support"
+      ]
+    },
+    {
+      "id": "E-02",
+      "title": "Qualified company, but no named contact",
+      "severity": "Critical",
+      "kind": "run",
+      "expected": "No email drafted; flagged for a human",
+      "input": {
+        "domain": "ledgerly.test",
+        "fixture": {
+          "pages": {
+            "/": "Ledgerly — finance automation\nLedgerly is the SaaS platform built for B2B companies to automate their finance operations.\nOur enterprise plan is used by enterprise customers worldwide.\nWe raised our Series B in 2026 and have 12 open roles.\nWe are a team of 120 people.\nWe're hiring a Compliance Manager to lead our first audit."
+          }
+        }
+      },
+      "hard": [
+        {
+          "path": "email",
+          "equals": null
+        },
+        {
+          "path": "qualification.flags",
+          "contains": "No usable contact"
+        }
+      ]
+    },
+    {
+      "id": "E-03",
+      "title": "Hook rests on a verified fact",
+      "severity": "High",
+      "kind": "run",
+      "expected": "hook_evidence_field names a filled fact",
+      "input": {
+        "domain": "ledgerly.test",
+        "fixture": {
+          "pages": {
+            "/": "Ledgerly — finance automation\nLedgerly is the SaaS platform built for B2B companies to automate their finance operations.\nOur enterprise plan is used by enterprise customers worldwide.\nWe raised our Series B in 2026 and have 12 open roles.\nWe are a team of 120 people.\nWe're hiring a Compliance Manager to lead our first audit."
+          },
+          "contact": {
+            "name": "Priya Shah",
+            "role": "Head of Security",
+            "email": "priya@ledgerly.test"
+          }
+        }
+      },
+      "hard": [
+        {
+          "path": "email.hook_evidence_field",
+          "in": [
+            "funding_stage",
+            "open_roles_count",
+            "enterprise_customers",
+            "compliance_signals",
+            "buyer_description"
+          ]
+        }
+      ]
+    }
+  ]
+}

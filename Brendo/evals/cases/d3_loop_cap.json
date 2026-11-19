@@ -1,0 +1,75 @@
+{
+  "decision": "D3 · Loop cap: when does it stop?",
+  "partitions": "Below the cap / exactly at the cap (boundary).",
+  "cases": [
+    {
+      "id": "D3-01",
+      "title": "Stage found on the careers page, below the cap",
+      "severity": "Low",
+      "kind": "run",
+      "expected": "Loop continues and answers it",
+      "input": {
+        "domain": "ledgerly.test",
+        "fixture": {
+          "pages": {
+            "/": "Ledgerly — finance automation\nLedgerly is the SaaS platform built for B2B companies to automate their finance operations.\nWe are a team of 120 people.",
+            "/careers": "Careers at Ledgerly\nWe raised our Series B in 2026 and have 12 open roles across the company."
+          },
+          "contact": {
+            "name": "Priya Shah",
+            "role": "Head of Security",
+            "email": "priya@ledgerly.test"
+          }
+        }
+      },
+      "hard": [
+        {
+          "path": "qualification.verdict",
+          "equals": "qualified"
+        },
+        {
+          "path": "qualification.fetches_used",
+          "lte": 4
+        },
+        {
+          "path": "decisions",
+          "contains": "answered after /careers"
+        }
+      ]
+    },
+    {
+      "id": "D3-02",
+      "title": "Nothing answers the stage: cap reached",
+      "severity": "Critical",
+      "kind": "run",
+      "expected": "Stops at the cap and escalates; no 5th fetch",
+      "input": {
+        "domain": "ledgerly.test",
+        "fixture": {
+          "pages": {
+            "/": "Ledgerly — tools for teams\nLedgerly is the SaaS platform built for B2B companies that want calmer weeks."
+          },
+          "contact": {
+            "name": "Priya Shah",
+            "role": "Head of Security",
+            "email": "priya@ledgerly.test"
+          }
+        }
+      },
+      "hard": [
+        {
+          "path": "qualification.verdict",
+          "equals": "escalated"
+        },
+        {
+          "path": "qualification.fetches_used",
+          "equals": 4
+        },
+        {
+          "path": "qualification.reasons",
+          "contains": "fetch cap"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,33 @@
+{
+  "decision": "Canary · the test that should fail",
+  "partitions": "If this passes, the harness is not checking anything.",
+  "cases": [
+    {
+      "id": "X-01",
+      "title": "Deliberately wrong expectation: a good-fit company 'should' be rejected",
+      "severity": "Critical",
+      "kind": "run",
+      "expected": "This row must FAIL every run",
+      "input": {
+        "domain": "ledgerly.test",
+        "fixture": {
+          "pages": {
+            "/": "Ledgerly — finance automation\nLedgerly is the SaaS platform built for B2B companies to automate their finance operations.\nOur enterprise plan is used by enterprise customers worldwide.\nWe raised our Series B in 2026 and have 12 open roles.\nWe are a team of 120 people.\nWe're hiring a Compliance Manager to lead our first audit."
+          },
+          "contact": {
+            "name": "Priya Shah",
+            "role": "Head of Security",
+            "email": "priya@ledgerly.test"
+          }
+        }
+      },
+      "hard": [
+        {
+          "path": "qualification.verdict",
+          "equals": "disqualified"
+        }
+      ],
+      "must_fail": true
+    }
+  ]
+}

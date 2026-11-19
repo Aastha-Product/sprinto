@@ -14,6 +14,7 @@ import re
 import smtplib
 from email.mime.text import MIMEText
 
+from . import guard
 from .config import Settings
 from .llm import LLM
 from .schemas import Contact, CompanyFields, Email, CompanyResult, Qualification
@@ -35,6 +36,12 @@ def check(d: dict, company: CompanyFields, contact: Contact) -> list[str]:
         problems.append(f"The body is {words} words; keep it under {MAX_WORDS}.")
     if re.search(r"\[[A-Za-z ]+\]|\{\{|\}\}", body + d.get("subject", "")):
         problems.append("Remove placeholder text like [Name] or {{...}}.")
+    extra = guard.contact_details(body + " " + d.get("subject", ""))
+    if extra:
+        problems.append("Remove links, email addresses and phone numbers: " + ", ".join(extra[:3]))
+    _, injected = guard.scan(body + "\n" + d.get("subject", ""))
+    if injected:
+        problems.append("Remove text addressed to AI tools: " + injected[0][:80])
     f = d.get("hook_evidence_field")
     if not f or not company.has(f):
         problems.append("The hook must rest on one of the given facts; "
@@ -43,14 +50,22 @@ def check(d: dict, company: CompanyFields, contact: Contact) -> list[str]:
 
 
 def draft(company: CompanyFields, contact: Contact, pains: list[dict], llm: LLM,
-          result: CompanyResult) -> Email | None:
+          result: CompanyResult, corrections: list[dict] | None = None) -> Email | None:
+    from . import feedback
     cdict = company.to_dict()
     who = {"name": contact.name, "role": contact.role}
-    d = llm.write_email(cdict, who, pains)
+    applied, skipped = feedback.select(corrections, company)
+    for c in applied:
+        result.log("feedback", f"applying {c['id']} ({c.get('topic')}): {c['lesson']}")
+    for c, why in skipped:
+        result.log("feedback", f"not applying {c.get('id')}: {why}")
+    style = [c["lesson"] for c in applied]
+    extra = {"style": style} if style else {}
+    d = llm.write_email(cdict, who, pains, **extra)
     problems = check(d, company, contact)
     if problems:
         result.log("draft", "redraft needed: " + " ".join(problems))
-        d = llm.write_email(cdict, who, pains, feedback=problems)
+        d = llm.write_email(cdict, who, pains, feedback=problems, **extra)
         problems = check(d, company, contact)
         if problems:
             result.log("draft", "draft still failing checks --- flagged: " + " ".join(problems))
@@ -61,6 +76,7 @@ def draft(company: CompanyFields, contact: Contact, pains: list[dict], llm: LLM,
         hook=d.get("hook", ""),
         hook_evidence_field=d.get("hook_evidence_field"),
         pains=[p.get("pain", "") for p in pains],
+        applied_corrections=[c["id"] for c in applied],
     )
     ev = company.evidence.get(email.hook_evidence_field or "", "")
     result.log("draft", f"hook rests on '{email.hook_evidence_field}'"
