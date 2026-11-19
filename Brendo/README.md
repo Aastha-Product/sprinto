@@ -69,6 +69,16 @@ Then open http://localhost:8000.
    `GEMINI_API_KEY` (or `ANTHROPIC_API_KEY`), `HUNTER_API_KEY`, `GMAIL_ADDRESS`, `GMAIL_APP_PASSWORD`, `BRENDO_SEND_TO`, and optionally **`BRENDO_WEB_PASSWORD`**, a password for the site. Without it the site is **open**: anyone with the link can run it and spend your Gemini and Hunter quotas (emails still only go to `BRENDO_SEND_TO`). The setup check shows which ("Access").
 4. **Deploy** (or **Redeploy** after changing variables). Open the `….vercel.app` link (enter the site password if you set one) and click **Test the AI key**.
 
+**Fastest way to add the keys:** on your own computer, with `.env` filled in, run
+
+```
+python -m brendo.vercel_setup
+```
+
+It reads your `.env`, warns about common mistakes (placeholder recipient, mistyped Gmail address, a normal password instead of a 16-letter App Password), asks for a Vercel access token (hidden input), saves the keys to the `sprinto` project as encrypted variables, redeploys, and prints the live site's setup check. Only variable names are printed. Revoke the token afterwards.
+
+If Gmail isn't set up on the deployment, each drafted email shows **Drafted, NOT sent** with an **Open in Gmail** button (a pre-filled draft to `BRENDO_SEND_TO`) and **Copy email**.
+
 Things that differ on Vercel:
 
 - Each company gets up to 300 seconds (`maxDuration` in `vercel.json`); a company normally takes about a minute.
