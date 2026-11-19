@@ -80,6 +80,8 @@ def readiness(settings: Settings, ping: bool = True) -> dict:
         "ping": None,
         "note": None,
         "ok": True,
+        "storage": _storage_label(settings),
+        "approved_send_to": "the prospect (copy to you)" if prospects_enabled() else "your own inbox",
     }
     if ping and not settings.llm_is_mock:
         try:
@@ -121,7 +123,105 @@ def run_one(domain: str, settings: Settings, *, offline: bool = False, force: bo
                      "output_tokens": row["output_tokens"] or 0,
                      "est_cost_usd": row["est_cost_usd"]}
     d["usage"] = usage
+    d["run_id"] = run_id
+    if run_id and (d.get("email") or {}).get("subject"):
+        oid = f"{run_id}:{domain}"
+        st = Store(settings.db_path)
+        try:
+            d["outreach"] = _public_outreach(st.get_outreach(oid))
+        finally:
+            st.close()
     return d
+
+
+# --- human-in-the-loop: edit, approve & send / reject (workflow "HitL" + "Send Email") --
+def prospects_enabled() -> bool:
+    """Approved emails go to the real contact only when the owner opts in. Default: to
+    BRENDO_SEND_TO (the brief: 'hardcode to: your own email address')."""
+    return os.environ.get("BRENDO_SEND_TO_PROSPECTS", "").strip() == "1"
+
+
+def _storage_label(settings: Settings) -> str:
+    from .store import database_url
+    if database_url():
+        return "postgres (kept between runs)"
+    if os.environ.get("VERCEL"):
+        return "temporary (/tmp on Vercel: lost between runs; add a Postgres DATABASE_URL)"
+    return f"sqlite ({settings.db_path.name})"
+
+
+_PUBLIC_OUT = ("id", "run_id", "domain", "company", "contact_name", "contact_role", "contact_email",
+               "subject_draft", "body_draft", "subject_final", "body_final", "edited", "status",
+               "sent_to", "error", "created_at", "updated_at", "approved_at", "sent_at")
+
+
+def _public_outreach(row: dict | None) -> dict | None:
+    return {k: row.get(k) for k in _PUBLIC_OUT} if row else None
+
+
+def approve(body: dict, settings: Settings) -> dict:
+    from .emailer import smtp_send
+    oid = str(body.get("id", ""))
+    action = str(body.get("action", "approve"))
+    if action not in ("approve", "reject"):
+        raise WebError(400, "action must be approve or reject")
+    st = Store(settings.db_path)
+    try:
+        row = st.get_outreach(oid)
+        if not row:
+            raise WebError(404, "That email isn't in the campaign record (it may be from before storage "
+                                "was set up, or temporary storage was reset). Run the company again.")
+        if row["status"] == "sent":
+            raise WebError(409, f"Already sent to {row['sent_to']} at {row['sent_at']}.")
+        now = _now_iso()
+        if action == "reject":
+            st.update_outreach(oid, status="rejected", approved_at=now)
+            st.save_review(row["run_id"], row["domain"], "rejected", None, "rejected on the website")
+            return {"outreach": _public_outreach(st.get_outreach(oid))}
+
+        subject = str(body.get("subject") or row["subject_draft"] or "").strip()
+        text = str(body.get("body") or row["body_draft"] or "").strip()
+        if not subject or not text:
+            raise WebError(400, "Subject and body can't be empty.")
+        if len(subject) > 300 or len(text) > 10000:
+            raise WebError(400, "Email too long (subject 300, body 10,000 characters max).")
+        edited = int(subject != (row["subject_draft"] or "").strip() or text != (row["body_draft"] or "").strip())
+        to_prospect = prospects_enabled() and bool(row.get("contact_email"))
+        to = row["contact_email"] if to_prospect else settings.send_to
+        fields = dict(subject_final=subject, body_final=text, edited=edited, approved_at=now)
+        st.save_review(row["run_id"], row["domain"], "edited" if edited else "approved", None,
+                       "approved on the website")
+        if settings.gmail_is_mock:
+            st.update_outreach(oid, status="approved_not_sent", error="Gmail isn't set up on this "
+                               "deployment (GMAIL_ADDRESS + GMAIL_APP_PASSWORD).", **fields)
+        elif not to_prospect and settings.send_to_is_placeholder:
+            st.update_outreach(oid, status="send_failed", error="BRENDO_SEND_TO is still a placeholder.",
+                               **fields)
+        else:
+            try:
+                smtp_send(settings, to, subject, text, bcc=settings.send_to if to_prospect else None)
+                st.update_outreach(oid, status="sent", sent_to=to, sent_at=_now_iso(), error=None, **fields)
+            except Exception as exc:
+                st.update_outreach(oid, status="send_failed", error=f"Gmail: {str(exc)[:160]}", **fields)
+        return {"outreach": _public_outreach(st.get_outreach(oid))}
+    finally:
+        st.close()
+
+
+def history(body: dict, settings: Settings) -> dict:
+    limit = max(1, min(int(body.get("limit") or 100), 500))
+    st = Store(settings.db_path)
+    try:
+        rows = [_public_outreach(r) for r in st.list_outreach(limit)]
+        stats = st.review_stats()
+    finally:
+        st.close()
+    return {"outreach": rows, "storage": _storage_label(settings), "review_stats": stats}
+
+
+def _now_iso() -> str:
+    from datetime import datetime, timezone
+    return datetime.now(timezone.utc).isoformat()
 
 
 def export(results: list[dict], reviews: dict | None = None) -> dict:
@@ -170,6 +270,10 @@ def handle_post(req: BaseHTTPRequestHandler, action: str, local: bool = False) -
             _respond(req, 200, run_one(str(body.get("domain", "")), settings,
                                        offline=bool(body.get("offline")),
                                        force=bool(body.get("force"))))
+        elif action == "approve":
+            _respond(req, 200, approve(body, settings))
+        elif action == "history":
+            _respond(req, 200, history(body, settings))
         elif action == "export":
             _respond(req, 200, export(body.get("results"), body.get("reviews")))
         else:
@@ -205,7 +309,7 @@ def serve(port: int = 8000) -> None:
 
     public = ROOT / "public"
     blueprint = ROOT / "brendo-blueprint.html"
-    actions = {f"/api/{a}": a for a in ("check", "run", "export")}
+    actions = {f"/api/{a}": a for a in ("check", "run", "export", "approve", "history")}
 
     class Local(SimpleHTTPRequestHandler):
         def __init__(self, *a, **kw):

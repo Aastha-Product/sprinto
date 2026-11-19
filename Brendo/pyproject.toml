@@ -12,6 +12,7 @@ dependencies = [
   "httpx>=0.27",
   "beautifulsoup4>=4.12",
   "anthropic>=2.10",   # structured outputs (output_config) + server-side refusal fallbacks
+  "psycopg[binary]>=3.2",   # Postgres campaign record when DATABASE_URL is set
 ]
 
 [project.optional-dependencies]
@@ -26,4 +27,4 @@ where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = ["src"]
+pythonpath = ["src", "."]

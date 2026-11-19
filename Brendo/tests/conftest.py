@@ -29,3 +29,23 @@ def settings(tmp_path):
     s.contacts_path = tmp_path / "contacts.csv"
     s.fetch_delay = 0.0
     return s
+
+
+_DB_ENV = ("BRENDO_DATABASE_URL", "DATABASE_URL", "POSTGRES_URL")
+
+
+@pytest.fixture(autouse=True)
+def _database_backend(monkeypatch):
+    """Default: SQLite (any DATABASE_URL from the shell is ignored).
+    With BRENDO_TEST_PG=<postgres url>, every test runs against a fresh Postgres schema."""
+    import os
+    pg = os.environ.get("BRENDO_TEST_PG", "")
+    for k in _DB_ENV:
+        monkeypatch.delenv(k, raising=False)
+    if pg:
+        import psycopg
+        with psycopg.connect(pg, autocommit=True) as c:
+            c.execute("DROP SCHEMA public CASCADE")
+            c.execute("CREATE SCHEMA public")
+        monkeypatch.setenv("DATABASE_URL", pg)
+    yield

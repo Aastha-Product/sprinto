@@ -84,7 +84,7 @@ def test_live_send_goes_only_to_self(settings, monkeypatch):
         def __exit__(self, *a): return False
         def starttls(self): pass
         def login(self, *a): pass
-        def send_message(self, msg): sent.append(msg)
+        def send_message(self, msg, to_addrs=None): sent.append(msg)
 
     import smtplib
     monkeypatch.setattr(smtplib, "SMTP", FakeSMTP)
