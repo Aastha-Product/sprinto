@@ -138,7 +138,7 @@ hr.soft{border:0;border-top:1px dashed var(--border);margin:22px 0}
       <span class="chip">Brief: "Cold Outreach, at Scale"</span>
       <span class="chip">Deck: "L4 — Data Acquisition &amp; Agent Loops" (42 slides)</span>
       <span class="chip">Plan of 14 Nov 2026</span>
-      <span class="chip ac">Status updated 18 Nov 2026</span>
+      <span class="chip ac">Status updated 19 Nov 2026</span>
     </div>
   </div>
 
@@ -150,8 +150,8 @@ hr.soft{border:0;border-top:1px dashed var(--border);margin:22px 0}
 
   <!-- 00 -->
   <section id="status">
-    <h2><span class="ph">Status · 18 Nov 2026</span>Build status — what's built</h2>
-    <p class="lead">Every phase of the roadmap (section 14) is built and covered by an offline test suite (89 tests, no keys, no network, run in CI on every push). The whole workflow now also runs from a website: on your own PC at <code>localhost</code>, or deployed on Vercel behind a site password. <strong>What remains is not code:</strong> the live 5-domain acceptance run and the Growth Lead's review of its output.</p>
+    <h2><span class="ph">Status · 19 Nov 2026</span>Build status — what's built</h2>
+    <p class="lead">Every phase of the roadmap (section 14) is built, and so is everything the 12 Nov <strong>Evals</strong> deck asks of this pipeline up to the send: the Series A–C and 50–200 size rules, recency and identity checks, an injection guard, draft editing with a feedback memory, and an evaluation harness with an LLM judge. 123 offline tests run in CI on every push. The whole workflow now also runs from a website: on your own PC at <code>localhost</code>, or deployed on Vercel behind a site password. <strong>What remains is not code:</strong> the live 5-domain acceptance run and the Growth Lead's review of its output.</p>
 
     <div class="tw"><table>
       <thead><tr><th>Roadmap phase</th><th>Status</th><th>Where it lives</th><th>How it was checked</th></tr></thead>
@@ -163,6 +163,12 @@ hr.soft{border:0;border-top:1px dashed var(--border);margin:22px 0}
         <tr><td>5 · PoC + email</td><td><span class="tag ok">BUILT</span></td><td><code>poc.py</code>, <code>painpoints.py</code>, <code>emailer.py</code></td><td>Hunter or <code>contacts.csv</code> (Apollo by hand) with ranked personas; two grounded pains; draft checked in code and redrafted once; Gmail send to self only, with a review note</td></tr>
         <tr><td>6 · Persistence</td><td><span class="tag ok">BUILT</span></td><td><code>store.py</code>, <code>orchestrator.py</code></td><td>Re-run skips cached results; failures never cached; one failure never stops the batch; <code>--why</code> decision log per run</td></tr>
         <tr><td>7 · QA + hardening</td><td><span class="tag part">CODE DONE · LIVE RUN PENDING</span></td><td><code>exporter.py</code>, the website's review panel</td><td>First live runs on 8 real SaaS domains fixed what they found; the 5-domain acceptance run (Assessment Frame) is next</td></tr>
+        <tr><td>+ Evals · D1 shortlist</td><td><span class="tag ok">BUILT</span></td><td><code>qualifier.py</code>, <code>config/icp.json</code></td><td>Series A–C only (Seed, D+ rejected); soft 50–200 headcount band (45 and 220 accepted and noted, 600 rejected); one test per partition</td></tr>
+        <tr><td>+ Evals · D2/D3 sufficiency + cap</td><td><span class="tag ok">BUILT</span></td><td><code>qualifier.py</code>, <code>scraper.py</code></td><td>Funding news over 2 years old is stale; a redirect to another company escalates; at the fetch cap the company is <em>escalated</em>, never a silent extra fetch</td></tr>
+        <tr><td>+ Evals · adversarial inputs</td><td><span class="tag ok">BUILT</span></td><td><code>guard.py</code>, <code>llm.py</code>, <code>emailer.py</code></td><td>Page text aimed at AI tools is removed and the company escalated; the model is told page text is data; drafts with links or contact details fail the checks</td></tr>
+        <tr><td>+ Evals · D4/D5 feedback loop + HITL edit</td><td><span class="tag ok">BUILT</span></td><td><code>feedback.py</code>, the website</td><td>Edit a draft, send your version; meaningful edits (judged on intent) become lessons; relevant lessons apply to later drafts, newest wins on the same topic</td></tr>
+        <tr><td>+ Evals · harness</td><td><span class="tag ok">BUILT</span></td><td><code>evals/cases/*.json</code>, <code>evals/harness.py</code></td><td>31 rows (Input / Expected / Assertion / Severity) run over HTTP; hard checks in code, soft by a judge from another model family; run twice, canary, break-on-purpose, human audit sample; Critical failure = do not ship</td></tr>
+        <tr><td>Evals · D6–D8 (replies, scheduling, booking, CRM)</td><td><span class="tag part">NOT IN SCOPE YET</span></td><td>—</td><td>Beyond the brief's 7 steps; needs Gmail inbox access, a calendar and a CRM</td></tr>
         <tr><td>+ Website</td><td><span class="tag ok">BUILT</span></td><td><code>public/index.html</code>, <code>api/</code>, <code>web.py</code>, <code>vercel.json</code></td><td>Browser test: unlock → check → run → report → review → CSV/Markdown download; API tests over real HTTP</td></tr>
       </tbody>
     </table></div>
@@ -172,6 +178,7 @@ hr.soft{border:0;border-top:1px dashed var(--border);margin:22px 0}
       <li><strong>Unlock</strong> with the site password (<code>BRENDO_WEB_PASSWORD</code>).</li>
       <li><strong>Setup check</strong> shows which services are live (LLM, Hunter, Gmail) and the only recipient; <em>Test the AI key</em> pings the model.</li>
       <li><strong>Run</strong>: paste domains. Each company goes through all 7 steps on the server and its card appears as it finishes: verdict and why, contact and why, two pains, the email, the send result and the full decision log.</li>
+      <li><strong>Edit and send</strong>: change any draft in place, save the edit so Brendo learns from it, and send your version to your own inbox.</li>
       <li><strong>Review</strong>: mark each draft approved / edited / rejected and whether the contact was right; the page shows the rewrite rate and PoC accuracy against the kill criteria.</li>
       <li><strong>Export</strong> the campaign record as CSV or Markdown, with your review marks filled in.</li>
     </ol>

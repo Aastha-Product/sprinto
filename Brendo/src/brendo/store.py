@@ -21,7 +21,8 @@ from pathlib import Path
 from .schemas import CompanyResult
 
 # A result is cached only when it is a decision, not an accident.
-FINAL_STATUSES = {"sent", "drafted", "qualified", "qualified_flagged", "flagged", "disqualified"}
+FINAL_STATUSES = {"sent", "drafted", "qualified", "qualified_flagged", "flagged", "escalated",
+                  "disqualified"}
 
 _RUN_COLUMNS = {
     "n_sent": "INTEGER", "n_failed": "INTEGER", "seconds_total": "REAL",

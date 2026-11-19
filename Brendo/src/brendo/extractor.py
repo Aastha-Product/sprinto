@@ -16,7 +16,7 @@ from .llm import LLM
 from .schemas import CompanyFields
 
 _SCALARS = ("is_saas", "buyer_description", "funding_stage", "open_roles_count",
-            "enterprise_customers")
+            "enterprise_customers", "employee_count", "funding_year")
 
 
 def _norm(s: str) -> str:

@@ -1,0 +1,377 @@
+{
+  "decision": "D1 · Shortlist: does this company match the ICP?",
+  "partitions": "Funding: Series A-C / outside A-C (Seed, D+) / missing. Size: within 50-200 / just outside (soft accept) / far outside (soft reject) / missing. B2B SaaS: yes / no / unclear. Certified: yes / no / unclear. Interaction: a near-band size is accepted when the other conditions pass.",
+  "cases": [
+    {
+      "id": "D1-01",
+      "title": "Series B, 120 staff, SaaS, not certified",
+      "severity": "Low",
+      "kind": "run",
+      "expected": "Shortlisted",
+      "input": {
+        "domain": "ledgerly.test",
+        "fixture": {
+          "pages": {
+            "/": "Ledgerly — finance automation\nLedgerly is the SaaS platform built for B2B companies to automate their finance operations.\nOur enterprise plan is used by enterprise customers worldwide.\nWe raised our Series B in 2026 and have 12 open roles.\nWe are a team of 120 people.\nWe're hiring a Compliance Manager to lead our first audit."
+          },
+          "contact": {
+            "name": "Priya Shah",
+            "role": "Head of Security",
+            "email": "priya@ledgerly.test"
+          }
+        }
+      },
+      "hard": [
+        {
+          "path": "qualification.verdict",
+          "equals": "qualified"
+        }
+      ],
+      "judge": [
+        "The reasons say why it qualified: B2B SaaS, not certified, and a stage signal",
+        "The reasons do not invent facts that are not on the page"
+      ]
+    },
+    {
+      "id": "D1-02",
+      "title": "Funding stage = Seed",
+      "severity": "Low",
+      "kind": "run",
+      "expected": "Rejected: outside Series A-C",
+      "input": {
+        "domain": "ledgerly.test",
+        "fixture": {
+          "pages": {
+            "/": "Ledgerly — finance automation\nLedgerly is the SaaS platform built for B2B companies to automate their finance operations.\nOur enterprise plan is used by enterprise customers worldwide.\nWe raised our Seed round in 2026.\nWe are a team of 120 people."
+          },
+          "contact": {
+            "name": "Priya Shah",
+            "role": "Head of Security",
+            "email": "priya@ledgerly.test"
+          }
+        }
+      },
+      "hard": [
+        {
+          "path": "qualification.verdict",
+          "equals": "disqualified"
+        },
+        {
+          "path": "qualification.reasons",
+          "contains": "outside Series A-C"
+        }
+      ]
+    },
+    {
+      "id": "D1-03",
+      "title": "Funding stage = Series D",
+      "severity": "Low",
+      "kind": "run",
+      "expected": "Rejected: outside Series A-C",
+      "input": {
+        "domain": "ledgerly.test",
+        "fixture": {
+          "pages": {
+            "/": "Ledgerly — finance automation\nLedgerly is the SaaS platform built for B2B companies to automate their finance operations.\nOur enterprise plan is used by enterprise customers worldwide.\nWe raised our Series D in 2026.\nWe are a team of 120 people."
+          },
+          "contact": {
+            "name": "Priya Shah",
+            "role": "Head of Security",
+            "email": "priya@ledgerly.test"
+          }
+        }
+      },
+      "hard": [
+        {
+          "path": "qualification.verdict",
+          "equals": "disqualified"
+        },
+        {
+          "path": "qualification.reasons",
+          "contains": "outside Series A-C"
+        }
+      ]
+    },
+    {
+      "id": "D1-04",
+      "title": "Funding stage missing, 12 open roles",
+      "severity": "High",
+      "kind": "run",
+      "expected": "Not rejected for funding; stage comes from open roles",
+      "input": {
+        "domain": "ledgerly.test",
+        "fixture": {
+          "pages": {
+            "/": "Ledgerly — finance automation\nLedgerly is the SaaS platform built for B2B companies to automate their finance operations.\nOur enterprise plan is used by enterprise customers worldwide.\nWe have 12 open roles across engineering and sales.\nWe are a team of 120 people."
+          },
+          "contact": {
+            "name": "Priya Shah",
+            "role": "Head of Security",
+            "email": "priya@ledgerly.test"
+          }
+        }
+      },
+      "hard": [
+        {
+          "path": "qualification.verdict",
+          "in": [
+            "qualified",
+            "qualified_flagged"
+          ]
+        },
+        {
+          "path": "qualification.reasons",
+          "not_contains": "outside Series A-C"
+        }
+      ]
+    },
+    {
+      "id": "D1-05",
+      "title": "Not B2B SaaS (a bakery)",
+      "severity": "Low",
+      "kind": "run",
+      "expected": "Rejected: not B2B SaaS",
+      "input": {
+        "domain": "sunrisebakery.test",
+        "fixture": {
+          "pages": {
+            "/": "Sunrise Bakery — fresh bread\nFresh bread and pastries baked daily in our family bakery since 1987.\nVisit our store; see store hours and our catering menu."
+          },
+          "contact": {
+            "name": "Priya Shah",
+            "role": "Head of Security",
+            "email": "priya@sunrisebakery.test"
+          }
+        }
+      },
+      "hard": [
+        {
+          "path": "qualification.verdict",
+          "equals": "disqualified"
+        },
+        {
+          "path": "qualification.reasons",
+          "contains": "not B2B SaaS"
+        }
+      ]
+    },
+    {
+      "id": "D1-06",
+      "title": "B2B SaaS unclear",
+      "severity": "High",
+      "kind": "run",
+      "expected": "Handed to a human, not guessed",
+      "input": {
+        "domain": "northwind.test",
+        "fixture": {
+          "pages": {
+            "/": "Northwind — partners in growth\nNorthwind works with partners across Europe to help them grow with confidence every year."
+          },
+          "contact": {
+            "name": "Priya Shah",
+            "role": "Head of Security",
+            "email": "priya@northwind.test"
+          }
+        }
+      },
+      "hard": [
+        {
+          "path": "qualification.verdict",
+          "equals": "escalated"
+        }
+      ],
+      "judge": [
+        "The output does not claim the company is or is not SaaS without evidence"
+      ]
+    },
+    {
+      "id": "D1-07",
+      "title": "Already certified (SOC 2)",
+      "severity": "High",
+      "kind": "run",
+      "expected": "Rejected: already certified",
+      "input": {
+        "domain": "ledgerly.test",
+        "fixture": {
+          "pages": {
+            "/": "Ledgerly — finance automation\nLedgerly is the SaaS platform built for B2B companies to automate their finance operations.\nOur enterprise plan is used by enterprise customers worldwide.\nWe are SOC 2 Type II certified and audited every year.\nWe raised our Series B in 2026 and have 12 open roles.\nWe are a team of 120 people."
+          },
+          "contact": {
+            "name": "Priya Shah",
+            "role": "Head of Security",
+            "email": "priya@ledgerly.test"
+          }
+        }
+      },
+      "hard": [
+        {
+          "path": "qualification.verdict",
+          "equals": "disqualified"
+        },
+        {
+          "path": "qualification.reasons",
+          "contains": "already certified"
+        }
+      ]
+    },
+    {
+      "id": "D1-08",
+      "title": "Certification only in progress",
+      "severity": "High",
+      "kind": "run",
+      "expected": "Not treated as certified; shortlisted",
+      "input": {
+        "domain": "ledgerly.test",
+        "fixture": {
+          "pages": {
+            "/": "Ledgerly — finance automation\nLedgerly is the SaaS platform built for B2B companies to automate their finance operations.\nOur enterprise plan is used by enterprise customers worldwide.\nWe raised our Series B in 2026 and have 12 open roles.\nWe are a team of 120 people.\nWe are working towards SOC 2 this year."
+          },
+          "contact": {
+            "name": "Priya Shah",
+            "role": "Head of Security",
+            "email": "priya@ledgerly.test"
+          }
+        }
+      },
+      "hard": [
+        {
+          "path": "qualification.verdict",
+          "equals": "qualified"
+        },
+        {
+          "path": "qualification.reasons",
+          "not_contains": "already certified"
+        }
+      ]
+    },
+    {
+      "id": "D1-09",
+      "title": "Size = 45 (just under 50)",
+      "severity": "High",
+      "kind": "run",
+      "expected": "Accepted; reasoning notes size is near the band",
+      "input": {
+        "domain": "ledgerly.test",
+        "fixture": {
+          "pages": {
+            "/": "Ledgerly — finance automation\nLedgerly is the SaaS platform built for B2B companies to automate their finance operations.\nOur enterprise plan is used by enterprise customers worldwide.\nWe raised our Series B in 2026 and have 12 open roles.\nWe are a team of 45 people."
+          },
+          "contact": {
+            "name": "Priya Shah",
+            "role": "Head of Security",
+            "email": "priya@ledgerly.test"
+          }
+        }
+      },
+      "hard": [
+        {
+          "path": "qualification.verdict",
+          "equals": "qualified"
+        },
+        {
+          "path": "qualification.reasons",
+          "contains": "just below"
+        }
+      ],
+      "judge": [
+        "The reasoning says the size (45) is outside the 50-200 band but close enough to accept"
+      ]
+    },
+    {
+      "id": "D1-10",
+      "title": "Size = 220 (just over 200)",
+      "severity": "High",
+      "kind": "run",
+      "expected": "Accepted; same soft-boundary logic, upper side",
+      "input": {
+        "domain": "ledgerly.test",
+        "fixture": {
+          "pages": {
+            "/": "Ledgerly — finance automation\nLedgerly is the SaaS platform built for B2B companies to automate their finance operations.\nOur enterprise plan is used by enterprise customers worldwide.\nWe raised our Series B in 2026 and have 12 open roles.\nWe are a team of 220 people."
+          },
+          "contact": {
+            "name": "Priya Shah",
+            "role": "Head of Security",
+            "email": "priya@ledgerly.test"
+          }
+        }
+      },
+      "hard": [
+        {
+          "path": "qualification.verdict",
+          "equals": "qualified"
+        },
+        {
+          "path": "qualification.reasons",
+          "contains": "just above"
+        }
+      ],
+      "judge": [
+        "The reasoning treats 220 the same way as 45: near the band, accepted"
+      ]
+    },
+    {
+      "id": "D1-11",
+      "title": "Size = 600, everything else passes",
+      "severity": "Critical",
+      "kind": "run",
+      "expected": "Rejected: far outside any reasonable band",
+      "input": {
+        "domain": "ledgerly.test",
+        "fixture": {
+          "pages": {
+            "/": "Ledgerly — finance automation\nLedgerly is the SaaS platform built for B2B companies to automate their finance operations.\nOur enterprise plan is used by enterprise customers worldwide.\nWe raised our Series B in 2026 and have 12 open roles.\nWe are a team of 600 people.\nWe're hiring a Compliance Manager to lead our first audit."
+          },
+          "contact": {
+            "name": "Priya Shah",
+            "role": "Head of Security",
+            "email": "priya@ledgerly.test"
+          }
+        }
+      },
+      "hard": [
+        {
+          "path": "qualification.verdict",
+          "equals": "disqualified"
+        },
+        {
+          "path": "qualification.reasons",
+          "contains": "far outside"
+        }
+      ],
+      "judge": [
+        "The reasoning states the size is far outside the band, not just 'outside'"
+      ]
+    },
+    {
+      "id": "D1-12",
+      "title": "Size not stated",
+      "severity": "High",
+      "kind": "run",
+      "expected": "Not rejected; flagged size unknown",
+      "input": {
+        "domain": "ledgerly.test",
+        "fixture": {
+          "pages": {
+            "/": "Ledgerly — finance automation\nLedgerly is the SaaS platform built for B2B companies to automate their finance operations.\nOur enterprise plan is used by enterprise customers worldwide.\nWe raised our Series B in 2026 and have 12 open roles.\nWe're hiring a Compliance Manager to lead our first audit."
+          },
+          "contact": {
+            "name": "Priya Shah",
+            "role": "Head of Security",
+            "email": "priya@ledgerly.test"
+          }
+        }
+      },
+      "hard": [
+        {
+          "path": "qualification.verdict",
+          "equals": "qualified"
+        },
+        {
+          "path": "qualification.flags",
+          "contains": "size unknown"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,132 @@
+{
+  "decision": "D2 · Scraper sufficiency: has the loop found enough?",
+  "partitions": "Completeness: all fields / some missing / nothing beyond the name. Recency: current / stale. Identity: correct company / a different company.",
+  "cases": [
+    {
+      "id": "D2-01",
+      "title": "Full firmographic + contact + recent news",
+      "severity": "Low",
+      "kind": "run",
+      "expected": "Judged sufficient; loop exits",
+      "input": {
+        "domain": "ledgerly.test",
+        "fixture": {
+          "pages": {
+            "/": "Ledgerly — finance automation\nLedgerly is the SaaS platform built for B2B companies to automate their finance operations.\nOur enterprise plan is used by enterprise customers worldwide.\nWe raised our Series B in 2026 and have 12 open roles.\nWe are a team of 120 people.\nWe're hiring a Compliance Manager to lead our first audit."
+          },
+          "contact": {
+            "name": "Priya Shah",
+            "role": "Head of Security",
+            "email": "priya@ledgerly.test"
+          }
+        }
+      },
+      "hard": [
+        {
+          "path": "qualification.verdict",
+          "equals": "qualified"
+        },
+        {
+          "path": "qualification.fetches_used",
+          "lte": 4
+        }
+      ],
+      "judge": [
+        "The reasons cite the funding stage, the B2B SaaS evidence and the compliance hiring signal"
+      ]
+    },
+    {
+      "id": "D2-02",
+      "title": "Only the company name",
+      "severity": "High",
+      "kind": "run",
+      "expected": "Judged insufficient; never qualified",
+      "input": {
+        "domain": "ledgerly.test",
+        "fixture": {
+          "pages": {
+            "/": "Ledgerly"
+          },
+          "contact": {
+            "name": "Priya Shah",
+            "role": "Head of Security",
+            "email": "priya@ledgerly.test"
+          }
+        }
+      },
+      "hard": [
+        {
+          "path": "qualification.verdict",
+          "equals": "escalated"
+        }
+      ]
+    },
+    {
+      "id": "D2-03",
+      "title": "Data complete but the funding news is 5 years old",
+      "severity": "Critical",
+      "kind": "run",
+      "expected": "Insufficient on recency, not just presence",
+      "input": {
+        "domain": "ledgerly.test",
+        "fixture": {
+          "pages": {
+            "/": "Ledgerly — finance automation\nLedgerly is the SaaS platform built for B2B companies to automate their finance operations.\nOur enterprise plan is used by enterprise customers worldwide.\nWe raised our Series B in 2021.\nWe are a team of 120 people."
+          },
+          "contact": {
+            "name": "Priya Shah",
+            "role": "Head of Security",
+            "email": "priya@ledgerly.test"
+          }
+        }
+      },
+      "hard": [
+        {
+          "path": "qualification.flags",
+          "contains": "stale"
+        },
+        {
+          "path": "qualification.reasons",
+          "not_contains": "funding: Series B"
+        }
+      ],
+      "judge": [
+        "The output treats the 2021 funding news as stale rather than as the current stage"
+      ]
+    },
+    {
+      "id": "D2-04",
+      "title": "Domain redirects to a different company (name collision)",
+      "severity": "Critical",
+      "kind": "run",
+      "expected": "Not accepted as a match; flagged",
+      "input": {
+        "domain": "ledgerly.test",
+        "fixture": {
+          "pages": {
+            "/": "Ledgerly — finance automation\nLedgerly is the SaaS platform built for B2B companies to automate their finance operations.\nOur enterprise plan is used by enterprise customers worldwide.\nWe raised our Series B in 2026 and have 12 open roles.\nWe are a team of 120 people."
+          },
+          "redirect_to": "https://www.othercorp.io/",
+          "contact": {
+            "name": "Priya Shah",
+            "role": "Head of Security",
+            "email": "priya@ledgerly.test"
+          }
+        }
+      },
+      "hard": [
+        {
+          "path": "qualification.verdict",
+          "equals": "escalated"
+        },
+        {
+          "path": "qualification.reasons",
+          "contains": "different company"
+        }
+      ],
+      "judge": [
+        "The reason mentions the mismatch between the domain and the company it now serves"
+      ]
+    }
+  ]
+}

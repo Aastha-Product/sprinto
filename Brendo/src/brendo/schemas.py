@@ -18,6 +18,8 @@ class CompanyFields:
     open_roles_count: int | None = None
     enterprise_customers: bool | None = None
     compliance_signals: list[str] = field(default_factory=list)  # audit prep, compliance hiring...
+    employee_count: int | None = None             # headcount the company states (size band)
+    funding_year: int | None = None               # year the funding round was announced, if stated
     evidence: dict[str, str] = field(default_factory=dict)  # field -> source snippet
 
     def has(self, name: str) -> bool:
@@ -32,7 +34,7 @@ class CompanyFields:
 
 @dataclass
 class Qualification:
-    verdict: str = "pending"          # qualified | qualified_flagged | disqualified | flagged | failed
+    verdict: str = "pending"          # qualified | qualified_flagged | disqualified | escalated | failed
     reasons: list[str] = field(default_factory=list)
     evidence: dict[str, str] = field(default_factory=dict)
     fetches_used: int = 0
@@ -62,6 +64,7 @@ class Email:
     sent: bool = False                # delivered via Gmail
     drafted: bool = False             # written to the mock outbox
     message_id: str | None = None
+    applied_corrections: list[str] = field(default_factory=list)   # feedback-memory ids used
 
 
 @dataclass

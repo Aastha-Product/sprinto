@@ -43,12 +43,12 @@ def test_disqualified_not_saas(settings):                    # T-QUA-3
     assert company.is_saas is False
 
 
-def test_thin_signal_stops_at_limits_and_flags(settings):   # T-QUA-4
+def test_thin_signal_escalates_at_the_fetch_cap(settings):   # T-QUA-4 / Evals D3
     _, qual, _ = _run_one(settings, "thinsignal.example")
-    assert qual.verdict == "qualified_flagged"
-    assert qual.rank == "lower"
-    assert qual.fetches_used <= settings.max_fetches
+    assert qual.verdict == "escalated"                       # at the cap: a human, not a 5th fetch
+    assert qual.fetches_used == settings.max_fetches
     assert any("thin" in f for f in qual.flags)
+    assert "fetch cap" in qual.reasons[0]
 
 
 def test_cap_reason_only_when_a_question_is_left_unanswered(settings):
@@ -99,12 +99,11 @@ def test_unreachable_homepage_fails_without_extra_fetches(settings):   # T-QUA-5
     assert dead.calls == 1
 
 
-def test_late_stage_qualifies_at_lower_rank_with_flag(settings):       # T-QUA-6
+def test_late_stage_is_rejected_outside_series_a_c(settings):     # T-QUA-6 / Evals D1
     company, qual, _ = _run_one(settings, "lateco.example")
-    assert qual.verdict == "qualified"
     assert company.funding_stage == "Series E"
-    assert qual.rank == "lower"
-    assert any("outside Series A-C" in f for f in qual.flags)
+    assert qual.verdict == "disqualified"
+    assert "outside Series A-C" in qual.reasons[0]
 
 
 def test_stage_bands(settings):

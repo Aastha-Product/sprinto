@@ -174,8 +174,12 @@ def main(argv: list[str] | None = None) -> int:
     if not settings.gmail_is_mock and settings.send_to_is_placeholder:
         print("WARNING: BRENDO_SEND_TO is a placeholder --- live sends will be refused.")
 
+    from . import feedback
+    corrections = feedback.load_file(settings.db_path.parent / "corrections.json")
+    if corrections:
+        print(f"Feedback memory: {len(corrections)} correction(s) from data/corrections.json")
     results = run_batch(domains, settings, offline=args.offline, use_browser=args.browser,
-                        force=args.force, input_file=input_file)
+                        force=args.force, input_file=input_file, corrections=corrections)
     print(format_report(results, settings))
     return 0
 

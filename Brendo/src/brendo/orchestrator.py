@@ -20,7 +20,11 @@ from . import qualifier, poc, painpoints, emailer
 _QUALIFIED = {"qualified", "qualified_flagged"}
 
 
-def process_one(domain: str, scraper: Scraper, llm, icp: dict, settings: Settings) -> CompanyResult:
+def process_one(domain: str, scraper: Scraper, llm, icp: dict, settings: Settings,
+                corrections: list[dict] | None = None, contact=None,
+                send: bool = True) -> CompanyResult:
+    """Run the 7 steps for one domain. `contact` overrides the PoC lookup (evaluation
+    fixtures); send=False stops at a checked draft (status 'drafted')."""
     result = CompanyResult(domain=domain)
     t0 = time.monotonic()
     try:
@@ -29,7 +33,10 @@ def process_one(domain: str, scraper: Scraper, llm, icp: dict, settings: Setting
         result.status = qual.verdict
 
         if qual.verdict in _QUALIFIED:
-            contact = poc.find_poc(domain, settings, result, icp.get("personas", []))
+            if contact is None:
+                contact = poc.find_poc(domain, settings, result, icp.get("personas", []))
+            else:
+                result.log("poc", f"{contact.name} ({contact.role}) --- {contact.reason or 'given'}")
             result.contact = contact
             if not contact.email or not contact.name:
                 missing = "email" if not contact.email else "name (the email must address them by name)"
@@ -44,12 +51,16 @@ def process_one(domain: str, scraper: Scraper, llm, icp: dict, settings: Setting
                 result.log("halt", f"only {len(pains)} grounded pain point(s) --- flagged, not drafting")
                 return result
             result.log("pains", " | ".join(f"{p['pain']} [{p['evidence_field']}]" for p in pains))
-            email = emailer.draft(company, contact, pains, llm, result)
+            email = emailer.draft(company, contact, pains, llm, result, corrections)
             if email is None:
                 qual.flags.append("Draft failed the quality checks twice --- write it by hand")
                 return result
             email.footer = emailer.why_footer(company, qual, contact, email, domain)
-            email = emailer.send(email, settings, result, tag=domain)
+            if send:
+                email = emailer.send(email, settings, result, tag=domain)
+            else:
+                email.drafted = True
+                result.log("send", "not sent --- draft only (evaluation run)")
             result.email = email
             if email.sent:
                 result.status = "sent"
@@ -84,7 +95,8 @@ def _cost(llm, settings: Settings) -> tuple[int, int, float | None]:
 
 def run_batch(domains: list[str], settings: Settings, *, offline: bool = False,
               use_browser: bool = False, force: bool = False,
-              input_file: str = "domains.csv") -> list[CompanyResult]:
+              input_file: str = "domains.csv",
+              corrections: list[dict] | None = None) -> list[CompanyResult]:
     seen: set[str] = set()
     clean_domains = []
     for d in domains:
@@ -111,7 +123,7 @@ def run_batch(domains: list[str], settings: Settings, *, offline: bool = False,
                 store.save_cached_reference(run_id, cached)
                 results.append(cached)
                 continue
-        result = process_one(domain, scraper, llm, icp, settings)
+        result = process_one(domain, scraper, llm, icp, settings, corrections)
         store.save_result(run_id, result)
         results.append(result)
 

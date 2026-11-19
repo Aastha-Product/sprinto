@@ -21,9 +21,11 @@ import re
 from http.server import BaseHTTPRequestHandler
 
 from .config import Settings, get_settings, redact
-from .orchestrator import run_batch, _display
+from .orchestrator import run_batch, process_one, _display
 from .store import Store
-from . import exporter, poc
+from . import emailer, exporter, feedback, poc
+from .schemas import CompanyResult, Contact, Email
+from .scraper import FixtureScraper
 
 MAX_BODY = 512 * 1024
 _HOST_RE = re.compile(r"^(?=.{4,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$")
@@ -70,6 +72,7 @@ def readiness(settings: Settings, ping: bool = True) -> dict:
     m_ext, m_draft = settings.active_models()
     out = {
         "llm": "mock" if settings.llm_is_mock else f"live: {settings.provider}",
+        "provider": settings.provider,
         "models": None if settings.llm_is_mock else [m_ext, m_draft],
         "poc": "mock" if settings.hunter_is_mock else "live: hunter.io",
         "contacts_file": len(poc.load_contacts(settings.contacts_path)),
@@ -95,7 +98,65 @@ def readiness(settings: Settings, ping: bool = True) -> dict:
     return out
 
 
-def run_one(domain: str, settings: Settings, *, offline: bool = False, force: bool = False) -> dict:
+def _corrections(raw) -> list[dict]:
+    if raw is None:
+        return []
+    if not isinstance(raw, list) or len(raw) > 200:
+        raise WebError(400, "corrections must be a list (at most 200).")
+    return [c for c in raw if isinstance(c, dict)]
+
+
+def run_fixture(domain: str, fixture: dict, settings: Settings,
+                corrections: list[dict] | None = None) -> dict:
+    """One company from fixed pages instead of the web: the evaluation harness's input.
+    Never fetches, never calls Hunter, never sends: it stops at a checked draft."""
+    from .llm import get_llm
+    if not isinstance(fixture, dict) or not isinstance(fixture.get("pages"), dict) or not fixture["pages"]:
+        raise WebError(400, "fixture.pages must be an object of path -> page text.")
+    pages = fixture["pages"]
+    if len(pages) > 12 or any(not isinstance(v, str) or len(v) > 60000 for v in pages.values()):
+        raise WebError(400, "fixture.pages: at most 12 pages of text, 60k characters each.")
+    domain = clean_domain(domain)
+    c = fixture.get("contact") or {}
+    contact = Contact(name=c.get("name"), role=c.get("role"), email=c.get("email"),
+                      source="fixture", confidence=1.0,
+                      reason=c.get("reason") or "contact given by the evaluation case")
+    scraper = FixtureScraper(pages, fixture.get("redirect_to"))
+    llm = get_llm(settings)
+    r = process_one(domain, scraper, llm, settings.load_icp(), settings,
+                    corrections=corrections, contact=contact, send=False)
+    d = r.to_dict()
+    d["fixture"] = True
+    d["usage"] = {"input_tokens": sum(v[0] for v in llm.usage.values()),
+                  "output_tokens": sum(v[1] for v in llm.usage.values()), "est_cost_usd": None}
+    return d
+
+
+def edit(before: dict, after: dict, settings: Settings) -> dict:
+    """Decision 5: is the Growth Lead's edit a correction worth learning from?"""
+    from .llm import get_llm
+    for x in (before, after):
+        if not isinstance(x, dict) or len(str(x)) > 20000:
+            raise WebError(400, "before and after must be {subject, body} objects.")
+    return feedback.classify(before, after, get_llm(settings))
+
+
+def send_edited(domain: str, subject: str, body: str, footer: str, settings: Settings) -> dict:
+    """Send the Growth Lead's edited draft. The recipient is BRENDO_SEND_TO, as always."""
+    if not subject.strip() or not body.strip():
+        raise WebError(400, "The email needs a subject and a body.")
+    if len(subject) > 300 or len(body) > 8000 or len(footer) > 4000:
+        raise WebError(400, "That email is too long.")
+    domain = (domain or "").strip().lower()[:253]
+    result = CompanyResult(domain=domain)
+    email = emailer.send(Email(subject=subject.strip(), body=body.strip(), footer=footer),
+                         settings, result, tag=domain or "edited")
+    line = next((d["rationale"] for d in reversed(result.decisions) if d["step"] == "send"), "")
+    return {"sent": email.sent, "drafted": email.drafted, "send": line}
+
+
+def run_one(domain: str, settings: Settings, *, offline: bool = False, force: bool = False,
+            corrections: list[dict] | None = None) -> dict:
     if offline:
         domain = (domain or "").strip().lower()
         samples = {p.name for p in settings.samples_dir.iterdir() if p.is_dir()}
@@ -104,7 +165,8 @@ def run_one(domain: str, settings: Settings, *, offline: bool = False, force: bo
                                 + ", ".join(sorted(samples)))
     else:
         domain = clean_domain(domain)
-    results = run_batch([domain], settings, offline=offline, force=force, input_file="web")
+    results = run_batch([domain], settings, offline=offline, force=force, input_file="web",
+                        corrections=corrections)
     r = results[0]
     d = _display(r)
     d["cached"] = bool(getattr(r, "_cached", False))
@@ -166,9 +228,21 @@ def handle_post(req: BaseHTTPRequestHandler, action: str, local: bool = False) -
         if action == "check":
             _respond(req, 200, readiness(settings, ping=bool(body.get("ping", True))))
         elif action == "run":
-            _respond(req, 200, run_one(str(body.get("domain", "")), settings,
-                                       offline=bool(body.get("offline")),
-                                       force=bool(body.get("force"))))
+            corrections = _corrections(body.get("corrections"))
+            if body.get("fixture") is not None:
+                _respond(req, 200, run_fixture(str(body.get("domain", "")), body["fixture"],
+                                               settings, corrections))
+            else:
+                _respond(req, 200, run_one(str(body.get("domain", "")), settings,
+                                           offline=bool(body.get("offline")),
+                                           force=bool(body.get("force")),
+                                           corrections=corrections))
+        elif action == "edit":
+            _respond(req, 200, edit(body.get("before"), body.get("after"), settings))
+        elif action == "send":
+            _respond(req, 200, send_edited(str(body.get("domain", "")), str(body.get("subject", "")),
+                                           str(body.get("body", "")), str(body.get("footer", "")),
+                                           settings))
         elif action == "export":
             _respond(req, 200, export(body.get("results"), body.get("reviews")))
         else:
@@ -204,7 +278,7 @@ def serve(port: int = 8000) -> None:
 
     public = ROOT / "public"
     blueprint = ROOT / "brendo-blueprint.html"
-    actions = {f"/api/{a}": a for a in ("check", "run", "export")}
+    actions = {f"/api/{a}": a for a in ("check", "run", "export", "edit", "send")}
 
     class Local(SimpleHTTPRequestHandler):
         def __init__(self, *a, **kw):

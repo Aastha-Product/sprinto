@@ -39,6 +39,7 @@ class Fetch:
     status: str          # ok | thin | missing | blocked | error
     reason: str = ""
     links: list[tuple[str, str]] = field(default_factory=list)   # (absolute url, link text)
+    final_url: str = ""          # where redirects ended (identity check)
 
     @property
     def failed(self) -> bool:
@@ -127,15 +128,16 @@ class Scraper:
             return Fetch(url, "", "", "request", "blocked", note)
         self._pause(host)
         try:
-            raw = self._request(url)
+            res = self._request(url)
         except Exception as exc:
             code = getattr(getattr(exc, "response", None), "status_code", None)
             if code in (404, 410):
                 return Fetch(url, "", "", "request", "missing", f"HTTP {code}")
             status = "blocked" if _looks_blocked(exc) else "error"
             return Fetch(url, "", "", "request", status, str(exc)[:120])
+        raw, final = res if isinstance(res, tuple) else (res, url)
         clean = clean_html(raw)
-        links = extract_links(raw, url)
+        links = extract_links(raw, final)
         if len(clean) < _MIN_CONTENT and self.use_browser:
             try:
                 raw = self._browser(url)
@@ -143,13 +145,14 @@ class Scraper:
                              "ok" if clean_html(raw) else "thin", links=extract_links(raw, url))
             except Exception as exc:
                 return Fetch(url, raw, clean, "browser", "thin", str(exc)[:120], links)
-        return Fetch(url, raw, clean, "request", "ok" if clean else "thin", links=links)
+        return Fetch(url, raw, clean, "request", "ok" if clean else "thin", links=links,
+                     final_url=final)
 
-    def _request(self, url: str) -> str:
+    def _request(self, url: str) -> tuple[str, str]:
         import httpx
         r = httpx.get(url, headers={"User-Agent": USER_AGENT}, timeout=20, follow_redirects=True)
         r.raise_for_status()
-        return r.text
+        return r.text, str(r.url)
 
     def _browser(self, url: str) -> str:
         from playwright.sync_api import sync_playwright
@@ -178,3 +181,34 @@ def _looks_blocked(exc: Exception) -> bool:
     """401/403/429/503 from a bot wall or rate limit: logged as blocked, never bypassed (slide 21)."""
     resp = getattr(exc, "response", None)
     return getattr(resp, "status_code", None) in (401, 403, 429, 503)
+
+
+def _as_html(text: str) -> str:
+    """Plain-text fixture pages become simple HTML: one paragraph per line."""
+    if "<" in text and ">" in text:
+        return text
+    import html as _h
+    return "<main>" + "".join(f"<p>{_h.escape(ln)}</p>" for ln in text.splitlines() if ln.strip()) + "</main>"
+
+
+class FixtureScraper(Scraper):
+    """Serves fixed pages instead of the web: the evaluation harness's 'fixed scenario'
+    (Evals deck: the exact input, no variations). pages = {"/": text_or_html, ...};
+    redirect_to = a URL the homepage pretends to redirect to (identity tests)."""
+
+    def __init__(self, pages: dict, redirect_to: str | None = None):
+        super().__init__(Path("."), offline=True)
+        self.pages = {(k if k.startswith("/") else "/" + k).rstrip("/") or "/": v for k, v in pages.items()}
+        self.redirect_to = redirect_to
+
+    def fetch(self, domain: str, path: str = "/") -> Fetch:
+        url = path if path.startswith("http") else f"https://{domain}{path}"
+        parsed = urlparse(url)
+        key = (parsed.path or "/").rstrip("/") or "/"
+        if parsed.netloc != domain or key not in self.pages:
+            return Fetch(url, "", "", "fixture", "missing", "not in fixture")
+        raw = _as_html(str(self.pages[key]))
+        clean = clean_html(raw)
+        final = self.redirect_to if (key == "/" and self.redirect_to) else url
+        return Fetch(url, raw, clean, "fixture", "ok" if clean else "thin",
+                     links=extract_links(raw, url), final_url=final)

@@ -31,8 +31,8 @@ def _next_step(d: dict) -> str:
         return "Review the draft in your inbox; edit if needed; send from your own mailbox"
     if s in ("qualified", "qualified_flagged"):
         return "Qualified but not drafted: " + (flags[-1] if flags else "see checks")
-    if s == "flagged":
-        return "Manual review: decide fit by hand"
+    if s in ("escalated", "flagged"):          # 'flagged' = older runs
+        return "Escalated to a human: decide fit by hand"
     if s == "failed":
         return "Retry next run, or research by hand: " + (d.get("error") or "")
     return "No outreach"
@@ -81,7 +81,7 @@ def render(results: list[dict], reviews: dict[str, dict] | None = None,
     w.writerows(rows)
 
     md = [f"# {title}", ""]
-    order = {"sent": 0, "drafted": 0, "qualified": 1, "qualified_flagged": 2, "flagged": 3,
+    order = {"sent": 0, "drafted": 0, "qualified": 1, "qualified_flagged": 2, "escalated": 3, "flagged": 3,
              "failed": 4, "disqualified": 5}
     rank_order = {"high": 0, "normal": 1, "lower": 2, "": 3}
     for r in sorted(rows, key=lambda r: (order.get(r["status"], 9), rank_order.get(r["rank"], 3))):
