@@ -173,7 +173,7 @@ def test_timeout_is_retried(gem):
 
 def test_draft_quota_used_up_falls_back_to_extraction_model(gem):
     email = {"subject": "s", "body": "Hi Jane", "hook": "h", "hook_evidence_field": "funding_stage"}
-    gem.replies += [err(429, "You exceeded your current quota")] * 4 + [ok(email)]
+    gem.replies += [err(429, "You exceeded your current quota")] * 2 + [ok(email)]
     assert gem.write_email({}, {"name": "Jane"}, [])["subject"] == "s"
     assert "flash-lite" in gem.calls[-1]["url"] and gem.draft_fallback
     assert gem.model_draft == gem.model                       # stays switched for the run
@@ -212,3 +212,15 @@ def test_silent_draft_model_is_abandoned_after_two_timeouts(gem):
     assert gem.write_email({}, {"name": "Jane"}, [])["subject"] == "s"
     assert len(gem.calls) == 3 and "hydrogen" in gem.calls[1]["url"] and "flash-lite" in gem.calls[2]["url"]
     assert max(seen) <= 60                       # never the old 120 s wait
+
+
+def test_whole_chain_when_primary_models_are_overloaded(gem):
+    """Live: hydrogen out of quota AND 3.5-flash-lite overloaded -> 3.1-flash-lite answers,
+    and the overloaded models are skipped for the rest of the run."""
+    gem.replies += [err(503, "high demand")] * 2 + [ok(EXTRACTED)]
+    assert gem.extract_fields("x").name == "Acme"
+    assert "gemini-3.1-flash-lite" in gem.calls[-1]["url"]
+    gem.replies += [ok(EXTRACTED)]
+    gem.extract_fields("y")
+    assert "gemini-3.1-flash-lite" in gem.calls[-1]["url"]          # 3.5 not retried this run
+    assert "overloaded" in gem._down["gemini-3.5-flash-lite"]
