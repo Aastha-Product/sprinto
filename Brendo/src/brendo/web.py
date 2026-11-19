@@ -4,9 +4,9 @@ Each request runs ONE company through the same tested pipeline the CLI uses
 (orchestrator.run_batch), so a request stays well inside a serverless time limit and
 the page can show progress company by company.
 
-Access: every endpoint needs the site password (BRENDO_WEB_PASSWORD, sent in the
-X-Brendo-Password header). Without it anyone with the link could spend the LLM and
-Hunter quotas. If the variable is not set, the site refuses to run at all.
+Access: if BRENDO_WEB_PASSWORD is set, every endpoint needs it (X-Brendo-Password header).
+If it is not set, the site is open: anyone with the link can run it and spend the LLM
+and Hunter quotas (emails still only go to BRENDO_SEND_TO). The setup check says which.
 
 Safety rules carried over from the CLI, unchanged: the recipient is BRENDO_SEND_TO
 and nothing else; keys are read from the environment and never returned.
@@ -39,11 +39,11 @@ class WebError(Exception):
 # --- access -----------------------------------------------------------------------
 def check_password(given: str | None, local: bool = False) -> None:
     expected = os.environ.get("BRENDO_WEB_PASSWORD", "")
-    if not expected and local:
-        return  # `python -m brendo.web` on your own PC, bound to 127.0.0.1 only
     if not expected:
-        raise WebError(503, "This site has no password set. In Vercel, add the environment "
-                            "variable BRENDO_WEB_PASSWORD and redeploy.")
+        # No site password configured = open site (the owner's choice). Anyone with the
+        # link can run it and spend the LLM/Hunter quotas; emails still only ever go to
+        # BRENDO_SEND_TO. Set BRENDO_WEB_PASSWORD in Vercel to require a password again.
+        return
     if not given or not hmac.compare_digest(given.encode(), expected.encode()):
         raise WebError(401, "Wrong site password.")
 
@@ -69,6 +69,7 @@ def clean_domain(raw: str) -> str:
 def readiness(settings: Settings, ping: bool = True) -> dict:
     m_ext, m_draft = settings.active_models()
     out = {
+        "site_password": bool(os.environ.get("BRENDO_WEB_PASSWORD", "")),
         "llm": "mock" if settings.llm_is_mock else f"live: {settings.provider}",
         "models": None if settings.llm_is_mock else [m_ext, m_draft],
         "poc": "mock" if settings.hunter_is_mock else "live: hunter.io",

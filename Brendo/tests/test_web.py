@@ -42,12 +42,20 @@ def call(servers, action, body=None, password="s3cret"):
         return e.code, json.loads(e.read())
 
 
-def test_password_is_required(server, monkeypatch):
+def test_password_is_required_when_set(server, monkeypatch):
     assert call(server, "check", password=None)[0] == 401
     assert call(server, "check", password="nope")[0] == 401
-    monkeypatch.delenv("BRENDO_WEB_PASSWORD")
     status, out = call(server, "check")
-    assert status == 503 and "BRENDO_WEB_PASSWORD" in out["error"]
+    assert status == 200 and out["site_password"] is True
+
+
+def test_no_password_set_means_open_site(server, monkeypatch):
+    monkeypatch.delenv("BRENDO_WEB_PASSWORD")
+    status, out = call(server, "check", password=None)
+    assert status == 200 and out["site_password"] is False
+    status, out = call(server, "run", {"domain": "acme.example", "offline": True, "force": True},
+                       password=None)
+    assert status == 200
 
 
 def test_check_reports_modes_without_keys(server):

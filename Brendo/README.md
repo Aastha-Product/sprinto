@@ -66,8 +66,8 @@ Then open http://localhost:8000.
 1. vercel.com → **Add New… → Project** → import the GitHub repo `Aastha-Product/sprinto`.
 2. **Root Directory:** `Brendo`. **Framework Preset:** Other. Leave the build settings as they are (`vercel.json` sets them).
 3. **Environment Variables** (Settings → Environment Variables): the same names as `.env`, typed into Vercel, never committed:
-   `GEMINI_API_KEY` (or `ANTHROPIC_API_KEY`), `HUNTER_API_KEY`, `GMAIL_ADDRESS`, `GMAIL_APP_PASSWORD`, `BRENDO_SEND_TO`, and **`BRENDO_WEB_PASSWORD`**, a password you choose for the site. Without `BRENDO_WEB_PASSWORD` the site refuses to run, so a stranger with the link can't spend your quotas.
-4. **Deploy.** Open the `….vercel.app` link, enter the site password, and click **Test the AI key**.
+   `GEMINI_API_KEY` (or `ANTHROPIC_API_KEY`), `HUNTER_API_KEY`, `GMAIL_ADDRESS`, `GMAIL_APP_PASSWORD`, `BRENDO_SEND_TO`, and optionally **`BRENDO_WEB_PASSWORD`**, a password for the site. Without it the site is **open**: anyone with the link can run it and spend your Gemini and Hunter quotas (emails still only go to `BRENDO_SEND_TO`). The setup check shows which ("Access").
+4. **Deploy** (or **Redeploy** after changing variables). Open the `….vercel.app` link (enter the site password if you set one) and click **Test the AI key**.
 
 Things that differ on Vercel:
 
