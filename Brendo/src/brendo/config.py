@@ -48,6 +48,7 @@ class Settings:
     gemini_api_key: str = ""
     gemini_model: str = "gemini-3.5-flash-lite"      # extraction + pain points (cheap, free tier)
     gemini_model_draft: str = "gemini-4-hydrogen"    # drafting
+    gemini_fallbacks: list = field(default_factory=lambda: ["gemini-3.1-flash-lite"])
     llm_provider_pref: str = "auto"                  # auto | anthropic | gemini
     hunter_api_key: str = ""
     apollo_contact: str = ""           # legacy global hardcode --- ignored, see contacts_path
@@ -162,6 +163,8 @@ def get_settings() -> Settings:
         gemini_api_key=e("GEMINI_API_KEY", "") or e("GOOGLE_API_KEY", ""),
         gemini_model=e("BRENDO_GEMINI_MODEL", "") or "gemini-3.5-flash-lite",
         gemini_model_draft=e("BRENDO_GEMINI_MODEL_DRAFT", "") or "gemini-4-hydrogen",
+        gemini_fallbacks=[m.strip() for m in (e("BRENDO_GEMINI_FALLBACKS", "") or "gemini-3.1-flash-lite").split(",")
+                          if m.strip()],
         llm_provider_pref=e("BRENDO_LLM_PROVIDER", "auto") or "auto",
     )
     s.key_was_misplaced = False

@@ -227,6 +227,8 @@ class GeminiLLM:
         self._schema_field = True
         self._sleep = __import__("time").sleep
         self.draft_fallback: str | None = None
+        self.fallbacks: list[str] = list(getattr(settings, "gemini_fallbacks", []) or [])
+        self._down: dict[str, str] = {}           # model -> why it was skipped this run
         self.ping_note: str | None = None
 
     def _post(self, model: str, body: dict, timeout: float = 60, attempts: int = 3) -> dict:
@@ -311,23 +313,34 @@ class GeminiLLM:
                 last = RuntimeError(f"Gemini reply was not valid JSON for the schema: {exc}")
         raise RuntimeError(f"LLM call failed after retry: {last}")
 
-    def _draft_json(self, system: str, user: str, schema: dict) -> dict:
-        try:
-            # 2 tries of <= 60 s: leaves room in Vercel's 300 s to redraft on the fallback model
-            return self._json(self.model_draft, system, user, schema, attempts=2)
-        except GeminiError as exc:
-            if exc.status in (404, 429, 500, 503, 504) and self.model_draft != self.model:
-                # drafting model missing for this key (404) or its quota is used up (429):
-                # draft with the extraction model for the rest of the run
-                why = {404: "not available to this key", 429: "quota used up"}.get(
-                    exc.status, "overloaded at Google right now")
+    _SKIP = (404, 429, 500, 503, 504)   # missing / quota / overloaded / silent: try the next model
+    _WHY = {404: "not available to this key", 429: "quota used up"}
+
+    def _chain(self, models: list[str], system: str, user: str, schema: dict, attempts: int = 2):
+        """Try models in order; one that is missing, out of quota or overloaded is skipped
+        for the rest of the run. Returns (reply, model used)."""
+        last: GeminiError | None = None
+        for m in dict.fromkeys(models):           # de-duplicated, order kept
+            if m in self._down:
+                continue
+            try:
+                return self._json(m, system, user, schema, attempts=attempts), m
+            except GeminiError as exc:
+                if exc.status not in self._SKIP:
+                    raise
+                self._down[m] = self._WHY.get(exc.status, "overloaded or slow at Google")
                 import sys
-                print(f"[brendo] {self.model_draft} {why} --- drafting with {self.model} instead",
-                      file=sys.stderr)
-                self.draft_fallback = f"{self.model_draft} {why}; drafted with {self.model}"
-                self.model_draft = self.model
-                return self._json(self.model, system, user, schema)
-            raise
+                print(f"[brendo] {m} {self._down[m]} --- trying the next model", file=sys.stderr)
+                last = exc
+        raise last or GeminiError(503, "no Gemini model available")
+
+    def _draft_json(self, system: str, user: str, schema: dict) -> dict:
+        orig = self.model_draft
+        out, used = self._chain([self.model_draft, self.model, *self.fallbacks], system, user, schema)
+        if used != orig:
+            self.draft_fallback = f"{orig} {self._down.get(orig, 'unavailable')}; drafted with {used}"
+            self.model_draft = used
+        return out
 
     def ping(self) -> bool:
         body = {"contents": [{"role": "user", "parts": [{"text": "ping"}]}],
@@ -348,11 +361,13 @@ class GeminiLLM:
         return True
 
     def extract_fields(self, text: str) -> CompanyFields:
-        return _fields_from_dict(self._json(self.model, _EXTRACT_SYS, text[:12000], EXTRACT_SCHEMA))
+        out, _ = self._chain([self.model, *self.fallbacks], _EXTRACT_SYS, text[:12000], EXTRACT_SCHEMA)
+        return _fields_from_dict(out)
 
     def infer_pain_points(self, company: dict, contact: dict) -> list[dict]:
         user = json.dumps({"facts": company, "contact": contact})
-        return self._json(self.model, _PAINS_SYS, user, PAINS_SCHEMA).get("pains", [])
+        out, _ = self._chain([self.model, *self.fallbacks], _PAINS_SYS, user, PAINS_SCHEMA)
+        return out.get("pains", [])
 
     def write_email(self, company: dict, contact: dict, pains: list[dict],
                     feedback: list[str] | None = None) -> dict:
