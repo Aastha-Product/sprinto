@@ -90,6 +90,19 @@ def _slug(s: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", (s or "email").lower()).strip("-")[:50]
 
 
+def smtp_send(settings: Settings, to: str, subject: str, text: str, bcc: str | None = None) -> None:
+    """Send one plain-text email through Gmail (App Password). Raises on failure."""
+    msg = MIMEText(text)
+    msg["Subject"] = subject
+    msg["From"] = settings.gmail_address
+    msg["To"] = to
+    rcpt = [to] + ([bcc] if bcc and bcc.lower() != to.lower() else [])
+    with smtplib.SMTP("smtp.gmail.com", 587, timeout=30) as s:
+        s.starttls()
+        s.login(settings.gmail_address, settings.gmail_app_password)
+        s.send_message(msg, to_addrs=rcpt)
+
+
 def send(email: Email, settings: Settings, result: CompanyResult, tag: str = "") -> Email:
     recipient = settings.send_to  # hardcoded to self --- never the prospect
     text = email.body + ("\n" + email.footer if email.footer else "")
@@ -107,14 +120,7 @@ def send(email: Email, settings: Settings, result: CompanyResult, tag: str = "")
                            "to your own address")
         return email
     try:
-        msg = MIMEText(text)
-        msg["Subject"] = email.subject
-        msg["From"] = settings.gmail_address
-        msg["To"] = recipient
-        with smtplib.SMTP("smtp.gmail.com", 587, timeout=30) as s:
-            s.starttls()
-            s.login(settings.gmail_address, settings.gmail_app_password)
-            s.send_message(msg)
+        smtp_send(settings, recipient, email.subject, text)
         email.sent = True
         email.message_id = "gmail:sent"
         result.log("send", f"sent via Gmail to {recipient}")

@@ -18,7 +18,7 @@ def server(settings, monkeypatch):
     monkeypatch.setattr(web, "get_settings", lambda: settings)
     monkeypatch.setenv("BRENDO_WEB_PASSWORD", "s3cret")
     servers = {}
-    for action in ("check", "run", "export"):
+    for action in ("check", "run", "export", "approve", "history"):
         srv = ThreadingHTTPServer(("127.0.0.1", 0), web.make_handler(action))
         threading.Thread(target=srv.serve_forever, daemon=True).start()
         servers[action] = srv

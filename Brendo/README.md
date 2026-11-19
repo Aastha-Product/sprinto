@@ -79,6 +79,10 @@ It reads your `.env`, warns about common mistakes (placeholder recipient, mistyp
 
 If Gmail isn't set up on the deployment, each drafted email shows **Drafted, NOT sent** with an **Open in Gmail** button (a pre-filled draft to `BRENDO_SEND_TO`) and **Copy email**.
 
+**Keep the campaign record between runs (Postgres):** in Vercel, open the project → **Storage** → **Create Database** → **Neon (Postgres)** → connect it to this project. Vercel adds `DATABASE_URL` automatically; redeploy. The setup check then shows **Storage: postgres (kept between runs)**. Without it, the record on Vercel lives in `/tmp` and is lost between runs.
+
+**Review, edit, approve (human in the loop):** every drafted email appears on the page as an editable draft with **Approve & send** and **Reject**. The **Campaign record** panel lists every email with its status (awaiting review, sent, rejected, send failed). Approved emails go to **your own inbox** (`BRENDO_SEND_TO`), as the brief requires. To send approved emails to the real contact instead, with a copy to you, set `BRENDO_SEND_TO_PROSPECTS=1` in Vercel; only do that once you're comfortable with the drafts, and remember cold email rules (GDPR, CAN-SPAM) apply. Every edit is stored as a draft-vs-final pair.
+
 Things that differ on Vercel:
 
 - Each company gets up to 300 seconds (`maxDuration` in `vercel.json`); a company normally takes about a minute.

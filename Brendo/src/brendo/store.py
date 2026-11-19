@@ -1,4 +1,9 @@
-"""SQLite cache + decision log + run metrics + review outcomes.
+"""Cache + decision log + run metrics + review outcomes + outreach log (campaign record).
+
+Backend: Postgres when DATABASE_URL / POSTGRES_URL / BRENDO_DATABASE_URL is set (e.g. Neon
+via Vercel's storage integration, which fills these in), else a local SQLite file. On
+Vercel without a database the SQLite file lives in /tmp and is lost between requests, so
+set a Postgres URL there to keep the campaign record.
 
 Jobs:
   1. Cost dial #3 (slide 15) --- don't research the same company twice within the TTL.
@@ -13,6 +18,8 @@ Older databases are upgraded in place: missing columns/tables are added on open.
 from __future__ import annotations
 
 import json
+import os
+import re
 import sqlite3
 import uuid
 from datetime import datetime, timezone
@@ -33,11 +40,72 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+# --- backend selection ------------------------------------------------------------
+def database_url() -> str:
+    for k in ("BRENDO_DATABASE_URL", "DATABASE_URL", "POSTGRES_URL"):
+        v = os.environ.get(k, "").strip()
+        if v.startswith(("postgres://", "postgresql://")):
+            return v
+    return ""
+
+
+# primary keys, for turning SQLite's INSERT OR REPLACE into a Postgres upsert
+_PK = {"runs": ["id"], "companies": ["domain"], "decisions": ["id"],
+       "results": ["run_id", "domain"], "reviews": ["run_id", "domain"], "outreach": ["id"]}
+_IOR = re.compile(r"INSERT OR REPLACE INTO (\w+)\s*\(([^)]*)\)", re.IGNORECASE)
+
+
+class _PgConn:
+    """Just enough of sqlite3.Connection on top of psycopg for Store's SQL."""
+
+    def __init__(self, url: str):
+        import psycopg
+        from psycopg.rows import dict_row
+        self.conn = psycopg.connect(url, row_factory=dict_row, connect_timeout=15)
+
+    @staticmethod
+    def _translate(sql: str) -> str:
+        m = _IOR.search(sql)
+        if m:
+            table, cols = m.group(1), [c.strip() for c in m.group(2).split(",")]
+            pk = _PK[table]
+            sets = ", ".join(f"{c}=EXCLUDED.{c}" for c in cols if c not in pk)
+            sql = _IOR.sub(f"INSERT INTO {table}({', '.join(cols)})", sql)
+            sql = sql.rstrip().rstrip(";") + f" ON CONFLICT ({', '.join(pk)}) DO " + \
+                (f"UPDATE SET {sets}" if sets else "NOTHING")
+        m = re.match(r"\s*PRAGMA table_info\((\w+)\)", sql, re.IGNORECASE)
+        if m:
+            return ("SELECT column_name AS name FROM information_schema.columns "
+                    f"WHERE table_name = '{m.group(1)}'")
+        return sql.replace("%", "%%").replace("?", "%s") if "?" in sql else sql
+
+    def execute(self, sql: str, params=()):
+        cur = self.conn.cursor()
+        cur.execute(self._translate(sql), tuple(params))
+        return cur
+
+    def executescript(self, script: str) -> None:
+        for stmt in (x.strip() for x in script.split(";")):
+            if stmt:
+                self.conn.execute(stmt.replace(" REAL", " DOUBLE PRECISION"))
+
+    def commit(self) -> None:
+        self.conn.commit()
+
+    def close(self) -> None:
+        self.conn.close()
+
+
 class Store:
-    def __init__(self, db_path: Path):
-        db_path.parent.mkdir(parents=True, exist_ok=True)
-        self.db = sqlite3.connect(str(db_path))
-        self.db.row_factory = sqlite3.Row
+    def __init__(self, db_path: Path, url: str | None = None):
+        url = database_url() if url is None else url
+        self.backend = "postgres" if url else "sqlite"
+        if url:
+            self.db = _PgConn(url)
+        else:
+            db_path.parent.mkdir(parents=True, exist_ok=True)
+            self.db = sqlite3.connect(str(db_path))
+            self.db.row_factory = sqlite3.Row
         self._init()
 
     def _init(self) -> None:
@@ -62,6 +130,13 @@ class Store:
                 run_id TEXT, domain TEXT, outcome TEXT, poc_correct INTEGER,
                 notes TEXT, reviewed_at TEXT,
                 PRIMARY KEY (run_id, domain)
+            );
+            CREATE TABLE IF NOT EXISTS outreach (
+                id TEXT PRIMARY KEY, run_id TEXT, domain TEXT, company TEXT,
+                contact_name TEXT, contact_role TEXT, contact_email TEXT,
+                subject_draft TEXT, body_draft TEXT, subject_final TEXT, body_final TEXT,
+                edited INTEGER, status TEXT, sent_to TEXT, error TEXT,
+                created_at TEXT, updated_at TEXT, approved_at TEXT, sent_at TEXT
             );
             """
         )
@@ -122,6 +197,7 @@ class Store:
 
     # --- persist ---
     def save_result(self, run_id: str, result: CompanyResult) -> None:
+        self.record_outreach(run_id, result)
         payload = json.dumps(result.to_dict())
         # per-run snapshot (feeds --export) is always written
         self.db.execute(
@@ -179,6 +255,46 @@ class Store:
         ).fetchall()
         return [json.loads(r["result_json"]) for r in rows]
 
+    # --- outreach: the campaign record + email log (Components Map outputs) ---
+    _OUT_COLS = ("id", "run_id", "domain", "company", "contact_name", "contact_role", "contact_email",
+                 "subject_draft", "body_draft", "subject_final", "body_final", "edited", "status",
+                 "sent_to", "error", "created_at", "updated_at", "approved_at", "sent_at")
+
+    def record_outreach(self, run_id: str, result: CompanyResult) -> str | None:
+        """One row per drafted email, created once; status starts at awaiting_review."""
+        e, c = result.email, result.contact
+        if not e or not e.subject:
+            return None
+        oid = f"{run_id}:{result.domain}"
+        if self.db.execute("SELECT id FROM outreach WHERE id=?", (oid,)).fetchone():
+            return oid
+        now = _now()
+        self.db.execute(
+            "INSERT INTO outreach(id, run_id, domain, company, contact_name, contact_role, contact_email, "
+            "subject_draft, body_draft, edited, status, created_at, updated_at) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            (oid, run_id, result.domain, (result.company.name if result.company else None),
+             c.name if c else None, c.role if c else None, c.email if c else None,
+             e.subject, e.body, 0, "awaiting_review", now, now))
+        self.db.commit()
+        return oid
+
+    def get_outreach(self, oid: str) -> dict | None:
+        row = self.db.execute("SELECT * FROM outreach WHERE id=?", (oid,)).fetchone()
+        return dict(row) if row else None
+
+    def update_outreach(self, oid: str, **fields) -> None:
+        fields = {k: v for k, v in fields.items() if k in self._OUT_COLS and k != "id"}
+        fields["updated_at"] = _now()
+        cols = ", ".join(f"{k}=?" for k in fields)
+        self.db.execute(f"UPDATE outreach SET {cols} WHERE id=?", (*fields.values(), oid))
+        self.db.commit()
+
+    def list_outreach(self, limit: int = 100) -> list[dict]:
+        rows = self.db.execute(
+            "SELECT * FROM outreach ORDER BY updated_at DESC LIMIT ?", (int(limit),)).fetchall()
+        return [dict(r) for r in rows]
+
     # --- reviews (slide 37 measurement plan) ---
     def save_review(self, run_id: str, domain: str, outcome: str, poc_correct: bool | None,
                     notes: str = "") -> None:
@@ -206,7 +322,7 @@ class Store:
     # --- privacy ---
     def purge(self, domain: str) -> int:
         n = 0
-        for table in ("companies", "decisions", "results", "reviews"):
+        for table in ("companies", "decisions", "results", "reviews", "outreach"):
             n += self.db.execute(f"DELETE FROM {table} WHERE domain=?", (domain,)).rowcount
         self.db.commit()
         return n

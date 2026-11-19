@@ -65,6 +65,9 @@ button:disabled{opacity:.5;cursor:not-allowed}
 .ok{color:var(--accent-fg)}
 a.btn{display:inline-block;text-decoration:none;padding:8px 14px;border-radius:8px;background:var(--accent);color:var(--bg);font-weight:600}
 button.secondary{background:transparent;color:var(--accent-fg)}
+table.hist{width:100%;border-collapse:collapse;font-size:14px}
+table.hist th,table.hist td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--border);vertical-align:top}
+.chip.sent{background:var(--accent-weak);color:var(--accent-fg)}
 pre.mail{white-space:pre-wrap;word-break:break-word;font:13px/1.55 var(--sans);background:var(--surface);
   border:1px solid var(--border);border-radius:9px;padding:12px;margin:4px 0 0}
 .log{font-family:var(--mono);font-size:12px;line-height:1.5;background:var(--surface);border-radius:8px;
@@ -143,6 +146,14 @@ dub.co</textarea>
       <div class="stats" id="reviewStats"></div>
     </div>
   </section>
+
+  <section class="card" id="historyCard" hidden>
+    <div class="row" style="justify-content:space-between"><h2 style="margin:0">6 · Campaign record</h2>
+      <button class="ghost" id="historyBtn" type="button">Refresh</button></div>
+    <p class="small muted" id="historyStorage" style="margin:6px 0 10px"></p>
+    <table class="hist"><thead><tr><th>Company</th><th>Contact</th><th>Status</th><th>Sent to</th><th>Updated</th></tr></thead>
+      <tbody id="historyRows"></tbody></table>
+  </section>
 </div>
 
 <script>
@@ -204,6 +215,7 @@ dub.co</textarea>
       $("checkCard").hidden = $("runCard").hidden = false;
       showCheck(r);
       renderAll();
+      loadHistory();
     } catch (e) {
       // on the silent first try with no saved password, just show the form
       msg.hidden = silent && !password && e.status === 401;
@@ -212,10 +224,13 @@ dub.co</textarea>
     }
   }
 
+  $("historyBtn").addEventListener("click", loadHistory);
+
   // ---- 2 · setup check --------------------------------------------------------
-  let recipient = "", llmMock = false;
+  let recipient = "", llmMock = false, approvedTo = "your own inbox", storage = "";
   function showCheck(r) {
     recipient = r.recipient_placeholder ? "" : (r.recipient || "");
+    approvedTo = r.approved_send_to || "your own inbox"; storage = r.storage || "";
     llmMock = r.llm === "mock";
     const out = $("checkOut"); out.replaceChildren();
     const add = (k, v) => out.append(el("dt", { text: k }), el("dd", { text: v }));
@@ -223,6 +238,8 @@ dub.co</textarea>
     add("PoC", r.poc + `; contacts.csv: ${r.contacts_file} hardcoded`);
     add("Send", r.send);
     add("Recipient", r.recipient + (r.recipient_placeholder ? "  ← placeholder: live sends refused" : ""));
+    add("Storage", r.storage || "");
+    add("Approved emails go to", r.approved_send_to || "");
     add("Access", r.site_password ? "Password protected" : "Open: anyone with this link can run it (set BRENDO_WEB_PASSWORD in Vercel to add a password)");
     if (r.ping) add("AI key test", r.ping);
     if (r.note) add("Note", r.note);
@@ -359,9 +376,15 @@ dub.co</textarea>
     if (c.name) sec("Point of contact", el("div", { text: `${c.name} — ${c.role || "role unknown"} <${c.email || "no email"}> [${c.source}]` }),
       c.reason ? el("div", { class: "small muted", text: "because " + c.reason }) : null);
     if ((e.pains || []).length) sec("Two pain points", list(e.pains));
-    if (e.subject) sec("Email", el("div", { class: "small muted", text: "Hook: " + (e.hook || "") }),
-      el("pre", { class: "mail", text: `Subject: ${e.subject}\n\n${e.body}` }));
-    if (e.subject) sec("Send", ...sendBlock(r, e));
+    if (e.subject && r.outreach) {
+      sec("Email: review, edit, approve", el("div", { class: "small muted", text: "Hook: " + (e.hook || "") }), approvalBlock(r));
+      const copy = sendLine(r);
+      if (copy) sec("Review copy (step 7)", el("div", { class: "small muted", text: (e.sent ? "✓ " : "") + copy }));
+    } else if (e.subject) {
+      sec("Email", el("div", { class: "small muted", text: "Hook: " + (e.hook || "") }),
+        el("pre", { class: "mail", text: `Subject: ${e.subject}\n\n${e.body}` }));
+      sec("Send", ...sendBlock(r, e));
+    }
     if (r.error) sec("Error", el("div", { class: "err", text: r.error }));
     if ((r.decisions || []).length) {
       const dl = el("details", {}, el("summary", { class: "small", text: `Decision log (${r.decisions.length} steps)` }),
@@ -371,6 +394,64 @@ dub.co</textarea>
     if (e.subject || c.name) body.append(renderReview(r));
     d.append(body);
     return d;
+  }
+
+  // ---- human in the loop: edit → approve & send / reject ----------------------
+  const OUT_LABEL = { awaiting_review: "awaiting your review", sent: "sent", rejected: "rejected",
+    approved_not_sent: "approved, NOT sent (Gmail not set up)", send_failed: "send failed" };
+  function approvalBlock(r) {
+    const o = r.outreach, box = el("div", {});
+    const status = el("div", { class: o.status === "sent" ? "ok" : /failed|not_sent/.test(o.status) ? "err" : "small muted",
+      text: o.status === "sent" ? `✓ Sent to ${o.sent_to} at ${new Date(o.sent_at).toLocaleString()}${o.edited ? " (edited)" : ""}`
+        : `Status: ${OUT_LABEL[o.status] || o.status}${o.error ? " — " + o.error : ""}` });
+    if (o.status === "sent" || o.status === "rejected") {
+      box.append(status, el("pre", { class: "mail", text: `Subject: ${o.subject_final || o.subject_draft}\n\n${o.body_final || o.body_draft}` }));
+      return box;
+    }
+    const subj = el("input", { type: "text", "aria-label": "Subject" }); subj.value = o.subject_final || o.subject_draft || "";
+    subj.style.width = "100%";
+    const body = el("textarea", { "aria-label": "Email body", rows: "12" }); body.value = o.body_final || o.body_draft || "";
+    body.style.width = "100%";
+    const approve = el("button", { type: "button", text: "Approve & send" });
+    const reject = el("button", { type: "button", class: "secondary", text: "Reject" });
+    const go = async (action) => {
+      approve.disabled = reject.disabled = true; status.className = "small muted"; status.textContent = action === "approve" ? "Sending…" : "Saving…";
+      try {
+        const res = await api("approve", { id: o.id, action, subject: subj.value, body: body.value });
+        r.outreach = res.outreach;
+        const edited = res.outreach.edited ? "edited" : "approved";
+        reviews[r.domain] = { ...(reviews[r.domain] || {}), review_outcome: action === "reject" ? "rejected" : edited };
+        persist(); renderAll(); loadHistory();
+      } catch (e) { status.className = "err"; status.textContent = e.message; approve.disabled = reject.disabled = false; }
+    };
+    approve.addEventListener("click", () => go("approve"));
+    reject.addEventListener("click", () => go("reject"));
+    box.append(el("label", { class: "small", text: "Subject" }), subj, el("label", { class: "small", text: "Body" }), body,
+      el("div", { class: "small muted", text: `Approve sends this exact text to ${approvedTo}${o.contact_email && approvedTo.startsWith("the prospect") ? ` (${o.contact_email})` : ""}.` }),
+      el("div", { class: "row", style: "margin-top:8px;gap:8px" }, approve, reject), status);
+    if (o.status === "approved_not_sent" || o.status === "send_failed") {
+      const url = "https://mail.google.com/mail/?view=cm&fs=1" + (recipient ? "&to=" + encodeURIComponent(recipient) : "")
+        + "&su=" + encodeURIComponent(subj.value) + "&body=" + encodeURIComponent(body.value);
+      box.append(el("div", { class: "row", style: "margin-top:8px" }, el("a", { class: "btn", href: url, target: "_blank", rel: "noopener", text: "Open in Gmail instead" })));
+    }
+    return box;
+  }
+
+  // ---- 6 · campaign record (persistent) ---------------------------------------
+  async function loadHistory() {
+    try {
+      const h = await api("history", { limit: 100 });
+      $("historyCard").hidden = false;
+      $("historyStorage").textContent = "Storage: " + h.storage;
+      const tb = $("historyRows"); tb.replaceChildren();
+      if (!h.outreach.length) tb.append(el("tr", {}, el("td", { colspan: "5", class: "muted small", text: "No emails yet." })));
+      for (const o of h.outreach) tb.append(el("tr", {},
+        el("td", { text: o.company || o.domain }),
+        el("td", { text: o.contact_name ? `${o.contact_name} (${o.contact_role || "?"})` : "—" }),
+        el("td", {}, el("span", { class: `chip ${o.status === "sent" ? "sent" : o.status === "rejected" ? "disqualified" : "drafted"}`, text: OUT_LABEL[o.status] || o.status })),
+        el("td", { text: o.sent_to || "—" }),
+        el("td", { class: "small muted", text: new Date(o.updated_at).toLocaleString() })));
+    } catch (e) { /* history is optional; ignore when the API is unavailable */ }
   }
 
   // ---- 5 · review -------------------------------------------------------------

@@ -1,3 +1,4 @@
+import pytest
 import sqlite3
 from datetime import datetime, timedelta, timezone
 
@@ -40,6 +41,8 @@ def test_why_shows_one_run_not_a_pile_up(settings):                     # T-LOG-
     st.close()
 
 
+@pytest.mark.skipif(bool(__import__("os").environ.get("BRENDO_TEST_PG")),
+                    reason="builds an old SQLite file; Postgres creates tables fresh")
 def test_old_database_is_upgraded_in_place(settings):
     settings.db_path.parent.mkdir(parents=True, exist_ok=True)
     db = sqlite3.connect(settings.db_path)
