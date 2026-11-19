@@ -274,8 +274,8 @@ class GeminiLLM:
             try:
                 data = self._post(model, body)
             except GeminiError as exc:
-                if exc.status == 429:
-                    raise                          # quota used up: _post already waited and retried
+                if exc.status in (429, 500, 503):
+                    raise                          # quota/overload: _post already waited and retried
                 if exc.status == 400 and self._schema_field and "schema" in str(exc).lower():
                     self._schema_field = False   # fall back to schema-in-prompt for the run
                     last = exc
@@ -310,10 +310,11 @@ class GeminiLLM:
         try:
             return self._json(self.model_draft, system, user, schema)
         except GeminiError as exc:
-            if exc.status in (404, 429) and self.model_draft != self.model:
+            if exc.status in (404, 429, 500, 503) and self.model_draft != self.model:
                 # drafting model missing for this key (404) or its quota is used up (429):
                 # draft with the extraction model for the rest of the run
-                why = "not available to this key" if exc.status == 404 else "quota used up"
+                why = {404: "not available to this key", 429: "quota used up"}.get(
+                    exc.status, "overloaded at Google right now")
                 import sys
                 print(f"[brendo] {self.model_draft} {why} --- drafting with {self.model} instead",
                       file=sys.stderr)
@@ -329,9 +330,10 @@ class GeminiLLM:
         try:
             self._post(self.model_draft, body)
         except GeminiError as exc:
-            if exc.status == 429:
-                self.ping_note = (f"{self.model_draft} quota used up for now --- drafts will use "
-                                  f"{self.model} until it resets")
+            if exc.status in (429, 500, 503):
+                why = "quota used up" if exc.status == 429 else "overloaded at Google"
+                self.ping_note = (f"{self.model_draft} {why} for now --- drafts will use "
+                                  f"{self.model} until it recovers")
                 return True
             if exc.status != 404:
                 raise

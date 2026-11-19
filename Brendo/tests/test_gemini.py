@@ -182,3 +182,15 @@ def test_draft_quota_used_up_falls_back_to_extraction_model(gem):
 def test_ping_treats_draft_quota_as_a_note(gem):
     gem.replies += [ok({})] + [err(429, "You exceeded your current quota")] * 4
     assert gem.ping() is True and "quota" in gem.ping_note
+
+
+def test_draft_model_overloaded_falls_back(gem):
+    email = {"subject": "s", "body": "Hi Jane", "hook": "h", "hook_evidence_field": "funding_stage"}
+    gem.replies += [err(503, "This model is currently experiencing high demand")] * 4 + [ok(email)]
+    assert gem.write_email({}, {"name": "Jane"}, [])["subject"] == "s"
+    assert "flash-lite" in gem.calls[-1]["url"] and "overloaded" in gem.draft_fallback
+
+
+def test_ping_treats_overloaded_draft_model_as_a_note(gem):
+    gem.replies += [ok({})] + [err(503, "high demand")] * 4
+    assert gem.ping() is True and "overloaded" in gem.ping_note
