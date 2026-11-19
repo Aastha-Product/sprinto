@@ -229,20 +229,25 @@ class GeminiLLM:
         self.draft_fallback: str | None = None
         self.ping_note: str | None = None
 
-    def _post(self, model: str, body: dict) -> dict:
-        """One generateContent call with backoff on 429/5xx (free-tier rate limits)."""
+    def _post(self, model: str, body: dict, timeout: float = 60, attempts: int = 3) -> dict:
+        """One generateContent call with backoff on 429/5xx (free-tier rate limits).
+
+        Time-boxed: an overloaded model often doesn't refuse, it just goes silent, and a
+        Vercel function has 300 s per company --- so each try waits at most `timeout` seconds.
+        """
         delay = 4.0
-        for attempt in range(4):
+        last = attempts - 1
+        for attempt in range(attempts):
             try:
-                r = self._httpx.post(self.URL.format(model=model), json=body, timeout=120,
+                r = self._httpx.post(self.URL.format(model=model), json=body, timeout=timeout,
                                      headers={"x-goog-api-key": self.key})
             except (self._httpx.TimeoutException, self._httpx.TransportError) as exc:
-                if attempt < 3:              # slow or dropped connection: wait and retry
+                if attempt < last:           # slow or dropped connection: wait and retry
                     self._sleep(delay)
                     delay *= 2
                     continue
                 raise GeminiError(504, f"Gemini {model}: no response after retries ({exc})") from exc
-            if r.status_code in (429, 500, 503) and attempt < 3:
+            if r.status_code in (429, 500, 503) and attempt < last:
                 self._sleep(delay)
                 delay *= 2
                 continue
@@ -255,7 +260,7 @@ class GeminiLLM:
             return r.json()
         raise GeminiError(429, f"Gemini {model}: still rate-limited after retries")
 
-    def _json(self, model: str, system: str, user: str, schema: dict) -> dict:
+    def _json(self, model: str, system: str, user: str, schema: dict, attempts: int = 3) -> dict:
         gschema = _gemini_schema(schema)
         last: Exception | None = None
         for _ in range(2):
@@ -272,9 +277,9 @@ class GeminiLLM:
                     system + "\n\nReply with ONLY a JSON object matching this JSON Schema:\n"
                     + json.dumps(gschema))
             try:
-                data = self._post(model, body)
+                data = self._post(model, body, attempts=attempts)
             except GeminiError as exc:
-                if exc.status in (429, 500, 503):
+                if exc.status in (429, 500, 503, 504):
                     raise                          # quota/overload: _post already waited and retried
                 if exc.status == 400 and self._schema_field and "schema" in str(exc).lower():
                     self._schema_field = False   # fall back to schema-in-prompt for the run
@@ -308,9 +313,10 @@ class GeminiLLM:
 
     def _draft_json(self, system: str, user: str, schema: dict) -> dict:
         try:
-            return self._json(self.model_draft, system, user, schema)
+            # 2 tries of <= 60 s: leaves room in Vercel's 300 s to redraft on the fallback model
+            return self._json(self.model_draft, system, user, schema, attempts=2)
         except GeminiError as exc:
-            if exc.status in (404, 429, 500, 503) and self.model_draft != self.model:
+            if exc.status in (404, 429, 500, 503, 504) and self.model_draft != self.model:
                 # drafting model missing for this key (404) or its quota is used up (429):
                 # draft with the extraction model for the rest of the run
                 why = {404: "not available to this key", 429: "quota used up"}.get(
@@ -326,12 +332,12 @@ class GeminiLLM:
     def ping(self) -> bool:
         body = {"contents": [{"role": "user", "parts": [{"text": "ping"}]}],
                 "generationConfig": {"maxOutputTokens": 16}}
-        self._post(self.model, body)
+        self._post(self.model, body, timeout=20, attempts=2)
         try:
-            self._post(self.model_draft, body)
+            self._post(self.model_draft, body, timeout=20, attempts=1)
         except GeminiError as exc:
-            if exc.status in (429, 500, 503):
-                why = "quota used up" if exc.status == 429 else "overloaded at Google"
+            if exc.status in (429, 500, 503, 504):
+                why = "quota used up" if exc.status == 429 else "overloaded or slow at Google"
                 self.ping_note = (f"{self.model_draft} {why} for now --- drafts will use "
                                   f"{self.model} until it recovers")
                 return True

@@ -194,3 +194,21 @@ def test_draft_model_overloaded_falls_back(gem):
 def test_ping_treats_overloaded_draft_model_as_a_note(gem):
     gem.replies += [ok({})] + [err(503, "high demand")] * 4
     assert gem.ping() is True and "overloaded" in gem.ping_note
+
+
+def test_silent_draft_model_is_abandoned_after_two_timeouts(gem):
+    import httpx
+    email = {"subject": "s", "body": "Hi Jane", "hook": "h", "hook_evidence_field": "funding_stage"}
+    gem.replies += [httpx.ReadTimeout("timed out"), httpx.ReadTimeout("timed out"), ok(email)]
+    orig, seen = gem._httpx.post, []
+
+    def post(*a, **k):
+        seen.append(k.get("timeout"))
+        r = orig(*a, **k)
+        if isinstance(r, Exception):
+            raise r
+        return r
+    gem._httpx.post = post
+    assert gem.write_email({}, {"name": "Jane"}, [])["subject"] == "s"
+    assert len(gem.calls) == 3 and "hydrogen" in gem.calls[1]["url"] and "flash-lite" in gem.calls[2]["url"]
+    assert max(seen) <= 60                       # never the old 120 s wait
