@@ -86,7 +86,7 @@ pre.mail{white-space:pre-wrap;word-break:break-word;font:13px/1.55 var(--sans);b
 
   <section class="card" id="lockCard">
     <h2>1 · Unlock</h2>
-    <p class="small muted" style="margin-top:0">The site password is the <code>BRENDO_WEB_PASSWORD</code> value set in Vercel. It stays in this browser tab only.</p>
+    <p class="small muted" style="margin-top:0">This site has a password (the <code>BRENDO_WEB_PASSWORD</code> value set in Vercel). It stays in this browser tab only.</p>
     <form class="row" id="lockForm">
       <input type="password" id="pw" placeholder="Site password" autocomplete="current-password">
       <button type="submit">Unlock</button>
@@ -217,12 +217,19 @@ dub.co</textarea>
     add("PoC", r.poc + `; contacts.csv: ${r.contacts_file} hardcoded`);
     add("Send", r.send);
     add("Recipient", r.recipient + (r.recipient_placeholder ? "  ← placeholder: live sends refused" : ""));
+    add("Access", r.site_password ? "Password protected" : "Open: anyone with this link can run it (set BRENDO_WEB_PASSWORD in Vercel to add a password)");
     if (r.ping) add("AI key test", r.ping);
     if (r.note) add("Note", r.note);
     const b = $("checkBanner"); b.replaceChildren();
     if (!r.ok) b.append(el("div", { class: "banner bad", text: "Something above needs fixing in Vercel → Settings → Environment Variables, then redeploy." }));
-    else if (r.llm === "mock" || r.poc === "mock" || r.send.startsWith("mock"))
-      b.append(el("div", { class: "banner", text: "Anything marked mock still runs end to end, with stand-ins instead of the live service." }));
+    else if (r.llm === "mock" || r.poc === "mock" || r.send.startsWith("mock")) {
+      const missing = [];
+      if (r.llm === "mock") missing.push("GEMINI_API_KEY");
+      if (r.poc === "mock") missing.push("HUNTER_API_KEY");
+      if (r.send.startsWith("mock")) missing.push("GMAIL_ADDRESS + GMAIL_APP_PASSWORD");
+      b.append(el("div", { class: "banner", text: "Not set in Vercel yet: " + missing.join(", ") +
+        ". Add them in Vercel → Settings → Environment Variables, then Redeploy. Until then those parts run as stand-ins (mock)." }));
+    }
   }
   $("pingBtn").addEventListener("click", async () => {
     const btn = $("pingBtn"); btn.disabled = true; btn.textContent = "Testing…";
